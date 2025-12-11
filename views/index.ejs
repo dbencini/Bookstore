@@ -1,0 +1,41 @@
+<div class="row mb-4">
+    <div class="col-md-6 offset-md-3">
+        <form action="/books" method="GET" class="d-flex">
+            <input class="form-control me-2" type="search" placeholder="Search by title or author" name="search"
+                value="<%= locals.search || '' %>">
+            <button class="btn btn-outline-success" type="submit">Search</button>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <% if (books.length===0) { %>
+        <div class="col-12 text-center">No books found.</div>
+        <% } %>
+            <% books.forEach(book=> { %>
+                <div class="col-6 col-md-4 col-lg-3 mb-4">
+                    <div class="card h-100">
+                        <a href="/books/<%= book.id %>">
+                            <img src="<%= book.imageUrl %>" class="card-img-top" alt="<%= book.title %>"
+                                style="height: 200px; object-fit: cover;">
+                        </a>
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">
+                                <a href="/books/<%= book.id %>" class="text-decoration-none text-dark">
+                                    <%= book.title %>
+                                </a>
+                            </h5>
+                            <p class="card-text text-muted">
+                                <%= book.author %>
+                            </p>
+                            <p class="card-text">
+                                <%= book.description.substring(0, 100) %>...
+                            </p>
+                            <div class="mt-auto">
+                                <span class="fs-5 fw-bold">$<%= book.price %></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <% }) %>
+</div>

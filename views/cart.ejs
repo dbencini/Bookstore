@@ -1,0 +1,60 @@
+<h1>Your Shopping Cart</h1>
+
+<% if (locals.message) { %>
+    <div class="alert alert-success">
+        <%= message %>
+    </div>
+    <% } %>
+
+        <% if (cartItems.length===0 && !locals.message) { %>
+            <p>Your cart is empty.</p>
+            <a href="/books" class="btn btn-primary">Continue Shopping</a>
+            <% } else if (cartItems.length> 0) { %>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Book</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Subtotal</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% cartItems.forEach(item=> { %>
+                            <tr>
+                                <td>
+                                    <%= item.Book.title %>
+                                </td>
+                                <td>$<%= item.Book.price %>
+                                </td>
+                                <td>
+                                    <%= item.quantity %>
+                                </td>
+                                <td>$<%= (item.quantity * item.Book.price).toFixed(2) %>
+                                </td>
+                                <td>
+                                    <form action="/cart/remove" method="POST">
+                                        <input type="hidden" name="itemId" value="<%= item.id %>">
+                                        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <% }) %>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                            <td><strong>$<%= total.toFixed(2) %></strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="d-flex justify-content-between">
+                    <a href="/books" class="btn btn-secondary">Continue Shopping</a>
+                    <form action="/cart/checkout" method="POST">
+                        <button type="submit" class="btn btn-success">Checkout</button>
+                    </form>
+                </div>
+                <% } %>

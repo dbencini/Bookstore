@@ -1,0 +1,180 @@
+<div class="container mt-4">
+    <h2>Book Management</h2>
+
+    <div class="mb-3 text-secondary">
+        Total Books: <strong>
+            <%= totalBooks %>
+        </strong> (Page <%= currentPage %>)
+    </div>
+
+    <!-- Advanced Search & Filter -->
+    <div class="card mb-3 admin-panel-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Advanced Search</span>
+            <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse"
+                data-bs-target="#searchPanel">
+                <i class="bi bi-funnel"></i> Toggle Filters
+            </button>
+        </div>
+        <div class="collapse <%= (filters && (filters.title || filters.author || filters.category || filters.startDate || filters.endDate)) ? 'show' : '' %>"
+            id="searchPanel">
+            <div class="card-body">
+                <form action="/admin/books" method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Title</label>
+                        <input type="text" name="title" class="form-control form-control-sm"
+                            value="<%= filters?.title || '' %>" placeholder="Contains...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Author</label>
+                        <input type="text" name="author" class="form-control form-control-sm"
+                            value="<%= filters?.author || '' %>" placeholder="Contains...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Category (Text)</label>
+                        <input type="text" name="category" class="form-control form-control-sm"
+                            value="<%= filters?.category || '' %>" placeholder="Like...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Date Range</label>
+                        <div class="input-group input-group-sm">
+                            <input type="date" name="startDate" class="form-control"
+                                value="<%= filters?.startDate || '' %>">
+                            <span class="input-group-text">-</span>
+                            <input type="date" name="endDate" class="form-control"
+                                value="<%= filters?.endDate || '' %>">
+                        </div>
+                    </div>
+                    <div class="col-12 text-end">
+                        <a href="/admin/books" class="btn btn-sm btn-secondary me-2">Clear</a>
+                        <button type="submit" class="btn btn-sm btn-primary">Search</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th style="width: 80px;">Cover</th>
+                <th>Title / Author</th>
+                <th>Category</th>
+                <th>Date Added</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% books.forEach(book=> { %>
+                <tr>
+                    <td>
+                        <img src="<%= book.imageUrl %>" alt="Cover" class="img-thumbnail" style="height: 60px;">
+                    </td>
+                    <td>
+                        <strong>
+                            <%= book.title %>
+                        </strong><br>
+                        <small class="text-muted">
+                            <%= book.author %>
+                        </small>
+                    </td>
+                    <td>
+                        <%= book.Category ? book.Category.name : 'Uncategorized' %>
+                    </td>
+                    <td>
+                        <%= new Date(book.createdAt).toLocaleDateString() %>
+                    </td>
+                    <td>
+                        <% if (book.isVisible) { %>
+                            <span class="badge bg-success">Visible</span>
+                            <% } else { %>
+                                <span class="badge bg-warning text-dark">Hidden</span>
+                                <% } %>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <!-- Toggle Visibility -->
+                            <form action="/admin/books/<%= book.id %>/toggle" method="POST" class="d-inline">
+                                <button type="submit"
+                                    class="btn btn-sm <%= book.isVisible ? 'btn-outline-warning' : 'btn-outline-success' %>"
+                                    title="<%= book.isVisible ? 'Hide Book' : 'Show Book' %>">
+                                    <i class="bi <%= book.isVisible ? 'bi-eye-slash' : 'bi-eye' %>"></i>
+                                </button>
+                            </form>
+
+                            <!-- Image Update Trigger (Modal or Popover ideal, avoiding complex JS for now, using simple input toggle or a compact inline form) -->
+                            <!-- Using a simple inline form for image URL for now -->
+                            <!-- Edit Details (Category & Image) -->
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" title="Edit Details">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <div class="dropdown-menu p-3" style="min-width: 300px;">
+                                    <form action="/admin/books/<%= book.id %>/update" method="POST">
+                                        <div class="mb-2">
+                                            <label class="form-label">Category</label>
+                                            <select name="categoryId" class="form-select form-select-sm">
+                                                <% categories.forEach(cat=> { %>
+                                                    <option value="<%= cat.id %>" <%=book.categoryId===cat.id
+                                                        ? 'selected' : '' %>>
+                                                        <%= cat.name %>
+                                                    </option>
+                                                    <% }) %>
+                                            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label">Image URL</label>
+                                            <input type="text" name="imageUrl" class="form-control form-control-sm"
+                                                value="<%= book.imageUrl %>">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">Save Changes</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Delete -->
+                            <form action="/admin/books/<%= book.id %>/delete" method="POST" class="d-inline"
+                                onsubmit="return confirm('Are you sure? This cannot be undone.');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Book">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <% }) %>
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <% if (totalPages> 1) { %>
+        <div class="admin-panel-dark p-2 rounded mt-3">
+            <nav aria-label="Book navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link"
+                            href="/admin/books?page=<%= currentPage - 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Previous</a>
+                    </li>
+                    <% for(let i=1; i <=totalPages; i++) { %>
+                        <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                            <a class="page-link"
+                                href="/admin/books?page=<%= i %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
+                                <%= i %>
+                            </a>
+                        </li>
+                        <% } %>
+                            <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                                <a class="page-link"
+                                    href="/admin/books?page=<%= currentPage + 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Next</a>
+                            </li>
+                </ul>
+            </nav>
+        </div>
+        <% } %>
+
+            <a href="/admin" class="btn btn-secondary mt-3">Back to Dashboard</a>
+</div>

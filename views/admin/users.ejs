@@ -1,0 +1,95 @@
+<div class="container mt-4">
+    <h2>User Management</h2>
+    <!-- Search & Filter -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form action="/admin/users" method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" name="search" class="form-control" placeholder="Search by Name or Email"
+                        value="<%= locals.search %>">
+                </div>
+                <div class="col-md-3">
+                    <select name="typeId" class="form-select">
+                        <option value="">All Roles</option>
+                        <% userTypes.forEach(type=> { %>
+                            <option value="<%= type.id %>" <%=locals.currentType===type.id ? 'selected' : '' %>><%=
+                                    type.name %>
+                            </option>
+                            <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+                <div class="col-md-2"><a href="/admin/users" class="btn btn-outline-secondary w-100">Reset</a></div>
+            </form>
+        </div>
+    </div>
+
+    <table class="table table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Password / Update</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% users.forEach(u=> { %>
+                <tr>
+                    <td>
+                        <%= u.name %>
+                    </td>
+                    <td>
+                        <input type="email" name="email" value="<%= u.email %>" form="update-form-<%= u.id %>"
+                            class="form-control form-control-sm">
+                    </td>
+                    <td>
+                        <select name="userTypeId" form="update-form-<%= u.id %>" class="form-select form-select-sm">
+                            <% userTypes.forEach(type=> { %>
+                                <option value="<%= type.id %>" <%=u.userTypeId===type.id ? 'selected' : '' %>><%=
+                                        type.name %>
+                                </option>
+                                <% }) %>
+                        </select>
+                    </td>
+                    <td>
+                        <form id="update-form-<%= u.id %>" action="/admin/users/<%= u.id %>/update" method="POST">
+                            <div class="input-group input-group-sm">
+                                <input type="password" name="password" placeholder="New Password" class="form-control">
+                                <button type="submit" class="btn btn-primary">Update</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                <% }) %>
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <% if (totalPages> 1) { %>
+        <nav aria-label="User navigation">
+            <ul class="pagination justify-content-center">
+                <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                    <a class="page-link"
+                        href="/admin/users?page=<%= currentPage - 1 %>&search=<%= search %>&typeId=<%= currentType %>">Previous</a>
+                </li>
+                <% for(let i=1; i <=totalPages; i++) { %>
+                    <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                        <a class="page-link"
+                            href="/admin/users?page=<%= i %>&search=<%= search %>&typeId=<%= currentType %>">
+                            <%= i %>
+                        </a>
+                    </li>
+                    <% } %>
+                        <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                            <a class="page-link"
+                                href="/admin/users?page=<%= currentPage + 1 %>&search=<%= search %>&typeId=<%= currentType %>">Next</a>
+                        </li>
+            </ul>
+        </nav>
+        <% } %>
+
+            <a href="/admin" class="btn btn-secondary">Back to Dashboard</a>
+</div>

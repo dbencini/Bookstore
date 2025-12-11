@@ -1,0 +1,36 @@
+# Tasks
+
+- [x] Research Book APIs/Feeds <!-- id: 0 -->
+    - [x] Evaluate Google Books API <!-- id: 1 -->
+    - [x] Evaluate Open Library API <!-- id: 2 -->
+    - [x] Evaluate NYT Books API <!-- id: 3 -->
+- [x] Database Refactor (UUIDs & Roles) <!-- id: 50 -->
+    - [x] Update Models to use UUIDs <!-- id: 51 -->
+    - [x] Create `UserType` model and seed data <!-- id: 52 -->
+    - [x] Add `userTypeId` to `Users` <!-- id: 53 -->
+- [x] Admin Dashboard <!-- id: 54 -->
+    - [x] Admin Middleware <!-- id: 55 -->
+    - [x] User Management UI (Edit Passwords/Emails) <!-- id: 56 -->
+    - [x] Cron Job Management UI <!-- id: 57 -->
+- [x] Background Ingestion (Enhanced) <!-- id: 58 -->
+    - [x] Implement `bookService` with Google Books API <!-- id: 59 -->
+    - [x] Implement Job Scheduler with UI controls <!-- id: 60 -->
+- [x] Fix User Management Grid Styling <!-- id: 61 -->
+    - [x] Optimize table for Light Mode <!-- id: 62 -->
+- [x] User Grid Pagination & Search <!-- id: 63 -->
+    - [x] Update User Grid UI (Search Form & Page Controls) <!-- id: 65 -->
+- [x] Fix Admin Dashboard Styles (Dark Mode) <!-- id: 66 -->
+- [x] Book Management Features <!-- id: 67 -->
+- [x] Add `isVisible` to Book Model & Migrate DB <!-- id: 68 -->
+    - [x] Update Admin Routes (CRUD + Toggle) <!-- id: 69 -->
+    - [x] Create Admin Book List View <!-- id: 70 -->
+    - [x] Update Public Routes (Filter Hidden) <!-- id: 71 -->
+- [x] Add Category Update to Book Management <!-- id: 72 -->
+- [x] Category Refactor & UI Polish <!-- id: 73 -->
+    - [x] Create Category Model & Associations <!-- id: 74 -->
+    - [x] Migrate Categories Script <!-- id: 75 -->
+    - [x] Update Admin Routes & Views (Combobox) <!-- id: 76 -->
+    - [x] Fix Dark Mode Dropdowns <!-- id: 77 -->
+- [x] Advanced Server-Side Search <!-- id: 78 -->
+    - [x] Update Admin Book Route (Like & Date Range) <!-- id: 79 -->
+    - [x] Add Advanced Filter UI to Books View <!-- id: 80 -->

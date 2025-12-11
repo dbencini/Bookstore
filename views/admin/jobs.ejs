@@ -1,0 +1,32 @@
+<div class="container mt-4">
+    <h2>Background Jobs</h2>
+
+    <% if (locals.message) { %>
+        <div class="alert alert-info">
+            <%= message %>
+        </div>
+        <% } %>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    Book Ingestion
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">Google Books API Import</h5>
+                    <p class="card-text">Fetch new books from Google Books API. Standard job runs twice daily.</p>
+
+                    <form action="/admin/jobs/trigger" method="POST">
+                        <div class="mb-3">
+                            <label for="query" class="form-label">Search Query (Optional)</label>
+                            <input type="text" class="form-control" id="query" name="query"
+                                placeholder="e.g. subject:history">
+                        </div>
+                        <button type="submit" class="btn btn-warning">Trigger Job Now</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <a href="/admin" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+</div>

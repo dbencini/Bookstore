@@ -1,0 +1,45 @@
+<div class="container mt-4">
+    <h1 class="mb-4">Admin Dashboard</h1>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-header">Total Users</div>
+                <div class="card-body">
+                    <h5 class="card-title display-4">
+                        <%= userCount %>
+                    </h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-header">Total Books</div>
+                <div class="card-body">
+                    <h5 class="card-title display-4">
+                        <%= bookCount %>
+                    </h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-header">Admin Users</div>
+                <div class="card-body">
+                    <h5 class="card-title display-4">
+                        <%= adminCount %>
+                    </h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <h3>Quick Actions</h3>
+        <div class="list-group">
+            <a href="/admin/books" class="list-group-item list-group-item-action">Manage Books</a>
+            <a href="/admin/users" class="list-group-item list-group-item-action">Manage Users</a>
+            <a href="/admin/jobs" class="list-group-item list-group-item-action">Manage Background Jobs</a>
+        </div>
+    </div>
+</div>

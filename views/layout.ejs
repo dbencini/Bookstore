@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= title %>
+    </title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body {
+            padding-top: 20px;
+        }
+
+        .card {
+            margin-bottom: 20px;
+        }
+
+        .theme-toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 text-center">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <% if (locals.siteConfig && locals.siteConfig.logoUrl) { %>
+                    <img src="<%= locals.siteConfig.logoUrl %>" alt="<%= locals.siteConfig.appName %>" height="45"
+                        class="d-inline-block align-middle me-2">
+                    <% } %>
+                        <%= locals.siteConfig ? locals.siteConfig.appName : 'My Bookstore' %>
+            </a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item">
+                        <span class="nav-link theme-toggle" id="theme-toggle" title="Toggle Dark Mode">🌓</span>
+                    </li>
+                    <% if (user) { %>
+                        <li class="nav-item me-3">
+                            <a class="nav-link position-relative" href="/cart">
+                                <i class="bi bi-basket3 fs-4"></i>
+                                <span
+                                    class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                    id="cart-count">
+                                    0
+                                    <span class="visually-hidden">items</span>
+                                </span>
+                            </a>
+                        </li>
+                        <li class="nav-item"><span class="nav-link">Hello, <%= user.name %></span></li>
+                        <% if (user.UserType && user.UserType.name==='Admin' ) { %>
+                            <li class="nav-item"><a class="nav-link text-warning" href="/admin">Dashboard</a></li>
+                            <% } %>
+                                <li class="nav-item"><a class="nav-link" href="/auth/logout">Logout</a></li>
+                                <% } else { %>
+                                    <li class="nav-item"><a class="nav-link" href="/auth/login">Login</a></li>
+                                    <li class="nav-item"><a class="nav-link" href="/auth/register">Register</a></li>
+                                    <% } %>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Category Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 p-0">
+        <div class="container">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#categoryNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-center" id="categoryNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link text-white text-uppercase fw-bold px-3"
+                            href="/books?category=Bestsellers">Bestsellers</a></li>
+                    <li class="nav-item"><a class="nav-link text-white text-uppercase fw-bold px-3"
+                            href="/books?category=Fiction">Fiction</a></li>
+                    <li class="nav-item"><a class="nav-link text-white text-uppercase fw-bold px-3"
+                            href="/books?category=Non-Fiction">Non-Fiction</a></li>
+                    <li class="nav-item"><a class="nav-link text-white text-uppercase fw-bold px-3"
+                            href="/books?category=Classics">Classics</a></li>
+                    <li class="nav-item"><a class="nav-link text-white text-uppercase fw-bold px-3"
+                            href="/books?category=Children's">Children's</a></li>
+                    <li class="nav-item"><a class="nav-link text-white text-uppercase fw-bold px-3"
+                            href="/books?category=Science Fiction">Sci-Fi</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+
+    <!-- Ad Carousel -->
+    <div id="adCarousel" class="carousel slide mb-4" data-bs-ride="carousel" data-bs-interval="3000">
+        <div class="carousel-indicators">
+            <button type="button" data-bs-target="#adCarousel" data-bs-slide-to="0" class="active" aria-current="true"
+                aria-label="Slide 1"></button>
+            <button type="button" data-bs-target="#adCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+            <button type="button" data-bs-target="#adCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+        </div>
+        <div class="carousel-inner">
+            <div class="carousel-item active">
+                <img src="/images/banner1.png" class="d-block w-100" alt="Cozy Library"
+                    style="height: 300px; object-fit: cover;">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5>Welcome to My Bookstore</h5>
+                    <p>Find your next favorite story.</p>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="/images/banner2.png" class="d-block w-100" alt="New Arrivals"
+                    style="height: 300px; object-fit: cover;">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5>New Arrivals</h5>
+                    <p>Check out the latest bestsellers.</p>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="/images/banner3.png" class="d-block w-100" alt="Summer Sale"
+                    style="height: 300px; object-fit: cover;">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5>Summer Sale</h5>
+                    <p>Get up to 50% off on selected titles.</p>
+                </div>
+            </div>
+        </div>
+        <button class="carousel-control-prev" type="button" data-bs-target="#adCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#adCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next</span>
+        </button>
+    </div>
+
+    <div class="container">
+        <%- body %>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const themeToggle = document.getElementById('theme-toggle');
+        const currentTheme = localStorage.getItem('theme');
+
+        if (currentTheme) {
+            document.documentElement.setAttribute('data-theme', currentTheme);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            let theme = 'light';
+            if (document.documentElement.getAttribute('data-theme') !== 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                theme = 'dark';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+            localStorage.setItem('theme', theme);
+        });
+    </script>
+</body>
+
+</html>

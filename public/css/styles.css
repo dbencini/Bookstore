@@ -1,0 +1,198 @@
+:root {
+    --bg-color: #ffffff;
+    --text-color: #212529;
+    --card-bg: #ffffff;
+    --navbar-bg: #f8f9fa;
+    --navbar-text: rgba(0, 0, 0, .55);
+    --navbar-brand: rgba(0, 0, 0, .9);
+    --border-color: rgba(0, 0, 0, .125);
+    --muted-color: #6c757d;
+    --input-bg: #fff;
+    --input-text: #212529;
+}
+
+[data-theme="dark"] {
+    --bg-color: #121212;
+    --text-color: #e0e0e0;
+    --card-bg: #1e1e1e;
+    --navbar-bg: #1f1f1f;
+    --navbar-text: #e0e0e0;
+    --navbar-brand: #ffffff;
+    --border-color: #333333;
+    --muted-color: #adb5bd;
+    --input-bg: #2b2b2b;
+    --input-text: #e0e0e0;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+label,
+.list-group-item {
+    color: var(--text-color);
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+.text-muted {
+    color: var(--muted-color) !important;
+}
+
+.navbar.bg-light {
+    background-color: var(--navbar-bg) !important;
+}
+
+.navbar-light .navbar-brand {
+    color: var(--navbar-brand);
+}
+
+.navbar-light .navbar-nav .nav-link {
+    color: var(--navbar-text);
+}
+
+input.form-control {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+
+input.form-control:focus {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: #86b7fe;
+    /* Bootstrap default focus color */
+}
+
+/* Ensure links in dark mode are readable if not covered by other rules */
+[data-theme="dark"] a:not(.btn):not(.nav-link) {
+    color: #6ea8fe;
+}
+
+/* Table Styling */
+.table {
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+.table>:not(caption)>*>* {
+    background-color: transparent;
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+/* Striped rows need adjustment for dark mode to be visible/nice, 
+   but for now just ensuring text color is correct is key. 
+   Bootstrap handles striped via verify-light overlay. */
+
+/* Form Select Styling */
+.form-select {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e0e0e0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+
+
+/* List Group Styling */
+.list-group-item {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+.list-group-item-action:hover,
+.list-group-item-action:focus {
+    background-color: var(--navbar-bg);
+    /* Use a slightly offset color for hover */
+    color: var(--text-color);
+}
+
+/* Dropdown Menu Dark Mode */
+[data-theme="dark"] .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .dropdown-item {
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+    color: var(--text-color);
+}
+
+/* Admin Custom Dark Panels */
+.admin-panel-dark {
+    background-color: #343a40 !important;
+    color: #f8f9fa !important;
+    border: 1px solid #454d55;
+}
+
+.admin-panel-dark .card-header {
+    background-color: #343a40 !important;
+    color: #f8f9fa !important;
+    border-bottom: 1px solid #454d55;
+}
+
+.admin-panel-dark .text-dark {
+    color: #f8f9fa !important;
+    /* Override Bootstrap text-dark if present */
+}
+
+/* Dark Panel Pagination Overrides */
+.admin-panel-dark .page-link {
+    background-color: #343a40 !important;
+    border-color: #454d55 !important;
+    color: #f8f9fa !important;
+}
+
+.admin-panel-dark .page-link:hover {
+    background-color: #23272b !important;
+    border-color: #1d2124 !important;
+    color: #fff !important;
+}
+
+.admin-panel-dark .page-item.active .page-link {
+    background-color: #495057 !important;
+    /* Lighter gray for active */
+    border-color: #6c757d !important;
+    color: #fff !important;
+    font-weight: bold;
+}
+
+.admin-panel-dark .page-item.disabled .page-link {
+    background-color: #343a40 !important;
+    border-color: #454d55 !important;
+    color: #6c757d !important;
+}
+
+/* Admin Card Body Theme Logic */
+.admin-panel-dark .card-body {
+    background-color: #f8f9fa !important;
+    /* Very Light Gray for Light Mode */
+    color: #212529 !important;
+    /* Dark text for Light Mode */
+}
+
+[data-theme="dark"] .admin-panel-dark .card-body {
+    background-color: #454d55 !important;
+    /* Lighter Dark Gray for Dark Mode */
+    color: #e0e0e0 !important;
+}
