@@ -82,4 +82,23 @@ All grids must implement efficient server-side operations.
 
 ### View Implementation
 -   **Comboboxes**: Use `<select>` populated by dictionary tables (e.g., Categories) with `[data-theme="dark"]` compatible styles (SVG arrow overrides).
--   **Toggle Buttons**: Use `<form>` submissions for simple boolean toggles (`isVisible`), avoiding complex client-side AJAX unless necessary.
+
+### Interactive Behavior
+
+#### A. Row Highlighting (Persistence)
+-   **Behavior**: Clicking any table row adds a `.table-highlight` class.
+-   **Persistence**: The ID of the last clicked row is saved to `localStorage`. On page load, the row is re-highlighted and automatically scrolled into view.
+-   **CSS**:
+    -   Light Mode: Light Blue (`#e2f0fd`)
+    -   Dark Mode: Deep Blue (`#375a7f`) via `[data-theme="dark"]` selector.
+
+#### B. Action Buttons (Toolbars)
+-   **Small Actions** (e.g., Visibility Toggle "Eye Icon", Delete):
+    -   **Must use AJAX** (`fetch`).
+    -   **Backend**: Route return JSON `{ success: true }`.
+    -   **Frontend**: Instantly update the DOM (toggle icon class / badge color) **without reloading the page**.
+
+#### C. Main Edit Forms (Modals)
+-   **Method**: Submit via `fetch` to catch server errors (e.g., validation, session expired).
+-   **Completion**: On `success: true`, perform a **Full Page Reload** (`window.location.reload()`).
+    -   *Rationale*: Ensures all related data (sums, sorting, counters) are 100% accurate without complex client-side state management.
