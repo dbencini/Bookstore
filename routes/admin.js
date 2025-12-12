@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, UserType, Book, Category } = require('../models');
+const { User, UserType, Book, Category, Job } = require('../models');
 // ...
 
 // Book Management
@@ -8,24 +8,13 @@ const { User, UserType, Book, Category } = require('../models');
 
 // ...
 
-router.post('/books/:id/update', async (req, res) => {
-    try {
-        const book = await Book.findByPk(req.params.id);
-        if (book) {
-            if (req.body.imageUrl !== undefined) book.imageUrl = req.body.imageUrl;
-            if (req.body.categoryId !== undefined) book.categoryId = req.body.categoryId;
-            await book.save();
-        }
-        res.redirect('/admin/books');
-    } catch (err) {
-        console.error(err);
-        res.redirect('/admin/books?error=UpdateFailed');
-    }
-});
+// Book Management
+// Middleware Imports
 const requireAdmin = require('../middleware/adminAuth');
-const { fetchGoogleBooks } = require('../services/bookService');
+const { fetchGoogleBooks, fixBookData, cancelJob } = require('../services/bookService');
 const bcrypt = require('bcrypt');
 
+// Apply Auth Middleware Globally to this Router
 router.use(requireAdmin);
 
 // Dashboard
@@ -191,9 +180,16 @@ router.post('/books/:id/toggle', async (req, res) => {
             book.isVisible = !book.isVisible;
             await book.save();
         }
+
+        if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+            return res.json({ success: true, isVisible: book ? book.isVisible : false });
+        }
         res.redirect('/admin/books');
     } catch (err) {
         console.error(err);
+        if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
         res.redirect('/admin/books?error=ToggleFailed');
     }
 });
@@ -201,9 +197,16 @@ router.post('/books/:id/toggle', async (req, res) => {
 router.post('/books/:id/delete', async (req, res) => {
     try {
         await Book.destroy({ where: { id: req.params.id } });
+
+        if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+            return res.json({ success: true });
+        }
         res.redirect('/admin/books');
     } catch (err) {
         console.error(err);
+        if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
         res.redirect('/admin/books?error=DeleteFailed');
     }
 });
@@ -212,28 +215,103 @@ router.post('/books/:id/update', async (req, res) => {
     try {
         const book = await Book.findByPk(req.params.id);
         if (book) {
-            if (req.body.imageUrl !== undefined) book.imageUrl = req.body.imageUrl;
-            if (req.body.category !== undefined) book.category = req.body.category;
+            const { categoryId, price, imageUrl, stock, description, isVisible } = req.body;
+            console.log('[DEBUG] Update Body:', req.body);
+            console.log('[DEBUG] Received Description:', description);
+
+            if (categoryId) book.categoryId = categoryId;
+            if (price) book.price = parseFloat(price);
+            if (imageUrl) book.imageUrl = imageUrl;
+
+            if (stock !== undefined && stock !== '') {
+                const stockVal = parseInt(stock, 10);
+                if (!isNaN(stockVal)) book.stock = stockVal;
+            }
+
+            if (description !== undefined) book.description = description;
+
+            // Checkbox handling: likely 'on' if checked, undefined if unchecked
+            book.isVisible = (isVisible === 'on');
+
             await book.save();
+
+            // Return JSON if client expects it (fetch)
+            if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+                return res.json({ success: true, book });
+            }
+        } else {
+            if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+                return res.status(404).json({ success: false, error: 'Book not found' });
+            }
         }
         res.redirect('/admin/books');
     } catch (err) {
         console.error(err);
+        if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+            return res.status(500).json({ success: false, error: 'Server Error: ' + err.message });
+        }
         res.redirect('/admin/books?error=UpdateFailed');
     }
 });
 
 // Job Management
-router.get('/jobs', (req, res) => {
-    res.render('admin/jobs', { page: 'jobs' });
+router.get('/jobs', async (req, res) => {
+    try {
+        const jobs = await Job.findAll({
+            include: [{
+                model: Book,
+                limit: 10, // Only get thumbnails for first 10
+                attributes: ['title', 'imageUrl', 'author', 'description']
+            }],
+            order: [['startTime', 'DESC']],
+            limit: 20 // Show last 20 jobs
+        });
+
+        res.render('admin/jobs', {
+            page: 'jobs',
+            jobs
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error fetching jobs');
+    }
 });
 
 router.post('/jobs/trigger', async (req, res) => {
-    const result = await fetchGoogleBooks(req.body.query || 'subject:fiction');
-    res.render('admin/jobs', {
-        page: 'jobs',
-        message: result.success ? `Job Success! Added ${result.added} books.` : `Job Failed: ${result.error}`
-    });
+    try {
+        await fetchGoogleBooks(req.body.query || 'subject:fiction');
+        res.redirect('/admin/jobs');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/jobs?error=JobFailed');
+    }
+});
+
+router.post('/jobs/fix-data', async (req, res) => {
+    try {
+        // Trigger async - don't wait for completion
+        fixBookData();
+        // Pause briefly to let the job creation happen so it appears on the list
+        await new Promise(r => setTimeout(r, 500));
+        res.redirect('/admin/jobs');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/jobs?error=FixFailed');
+    }
+});
+
+router.post('/jobs/:id/stop', async (req, res) => {
+    try {
+        const result = cancelJob(req.params.id);
+        if (result) {
+            // Wait briefly for the loop to break
+            await new Promise(r => setTimeout(r, 600));
+        }
+        res.redirect('/admin/jobs');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/jobs?error=StopFailed');
+    }
 });
 
 module.exports = router;

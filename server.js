@@ -6,7 +6,7 @@ const LocalStrategy = require('passport-local').Strategy;
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const SQLiteStore = require('connect-sqlite3')(session);
 const path = require('path');
-const { sequelize, User, UserType, SiteConfig } = require('./models');
+const { sequelize, User, UserType, SiteConfig, Category } = require('./models');
 const expressLayouts = require('express-ejs-layouts');
 const adminRoutes = require('./routes/admin');
 const { startCronJob } = require('./services/bookService');
@@ -15,7 +15,21 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use((req, res, next) => {
+    if (req.method === 'POST') {
+        console.log(`[Global Debug] POST ${req.url}`, req.body);
+        console.log(`[Global Debug] Headers: Accept=${req.headers.accept}, X-Requested-With=${req.headers['x-requested-with']}`);
+    }
+
+    res.on('finish', () => {
+        if (req.method === 'POST') {
+            console.log(`[Global Debug] Response Status: ${res.statusCode} Content-Type: ${res.get('Content-Type')}`);
+        }
+    });
+    next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(expressLayouts);
 app.set('view engine', 'ejs');
@@ -107,6 +121,10 @@ app.use(async (req, res, next) => {
             config = await SiteConfig.create({ appName: 'My Bookstore', theme: 'light' });
         }
         res.locals.siteConfig = config;
+
+        // Fetch Categories for Global Menu
+        const categories = await Category.findAll({ order: [['name', 'ASC']] });
+        res.locals.categories = categories;
     } catch (err) {
         console.error('Error loading site config:', err);
         res.locals.siteConfig = { appName: 'Fallback POD' };

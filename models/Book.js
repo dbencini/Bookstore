@@ -16,7 +16,7 @@ const Book = sequelize.define('Book', {
         allowNull: false
     },
     description: {
-        type: DataTypes.TEXT
+        type: DataTypes.STRING(4000)
     },
     price: {
         type: DataTypes.DECIMAL(10, 2),
@@ -36,7 +36,11 @@ const Book = sequelize.define('Book', {
     },
     categoryId: {
         type: DataTypes.UUID,
-        allowNull: true // Will be populated by migration
+        allowNull: true
+    },
+    JobId: {
+        type: DataTypes.UUID,
+        allowNull: true
     },
     isVisible: {
         type: DataTypes.BOOLEAN,

@@ -64,17 +64,32 @@ label,
     color: var(--navbar-text);
 }
 
-input.form-control {
+.form-control {
     background-color: var(--input-bg);
     color: var(--input-text);
     border-color: var(--border-color);
 }
 
-input.form-control:focus {
+.form-control:focus {
     background-color: var(--input-bg);
     color: var(--input-text);
     border-color: #86b7fe;
     /* Bootstrap default focus color */
+}
+
+.form-control:disabled,
+.form-control[readonly] {
+    background-color: var(--card-bg);
+    /* Use card background or similar for contrast */
+    color: var(--muted-color);
+    opacity: 1;
+}
+
+[data-theme="dark"] .form-control:disabled,
+[data-theme="dark"] .form-control[readonly] {
+    background-color: #252525;
+    /* Specific dark shade for disabled */
+    border-color: #333;
 }
 
 /* Ensure links in dark mode are readable if not covered by other rules */
@@ -195,4 +210,31 @@ input.form-control:focus {
     background-color: #454d55 !important;
     /* Lighter Dark Gray for Dark Mode */
     color: #e0e0e0 !important;
+}
+
+/* Modal Dark Mode */
+[data-theme="dark"] .modal-content {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-header {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-footer {
+    border-top-color: var(--border-color);
+}
+
+[data-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
 }

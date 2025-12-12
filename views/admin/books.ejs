@@ -61,6 +61,7 @@
             <tr>
                 <th style="width: 80px;">Cover</th>
                 <th>Title / Author</th>
+                <th>Price</th>
                 <th>Category</th>
                 <th>Date Added</th>
                 <th>Status</th>
@@ -69,7 +70,7 @@
         </thead>
         <tbody>
             <% books.forEach(book=> { %>
-                <tr>
+                <tr id="tr-<%= book.id %>">
                     <td>
                         <img src="<%= book.imageUrl %>" alt="Cover" class="img-thumbnail" style="height: 60px;">
                     </td>
@@ -80,6 +81,9 @@
                         <small class="text-muted">
                             <%= book.author %>
                         </small>
+                    </td>
+                    <td>
+                        $<%= book.price ? book.price.toFixed(2) : '0.00' %>
                     </td>
                     <td>
                         <%= book.Category ? book.Category.name : 'Uncategorized' %>
@@ -97,52 +101,29 @@
                     <td>
                         <div class="d-flex gap-2">
                             <!-- Toggle Visibility -->
-                            <form action="/admin/books/<%= book.id %>/toggle" method="POST" class="d-inline">
-                                <button type="submit"
-                                    class="btn btn-sm <%= book.isVisible ? 'btn-outline-warning' : 'btn-outline-success' %>"
-                                    title="<%= book.isVisible ? 'Hide Book' : 'Show Book' %>">
-                                    <i class="bi <%= book.isVisible ? 'bi-eye-slash' : 'bi-eye' %>"></i>
-                                </button>
-                            </form>
+                            <button type="button"
+                                class="btn btn-sm <%= book.isVisible ? 'btn-outline-warning' : 'btn-outline-success' %> btn-toggle-visibility"
+                                data-id="<%= book.id %>" data-visible="<%= book.isVisible %>"
+                                title="<%= book.isVisible ? 'Hide Book' : 'Show Book' %>">
+                                <i class="bi <%= book.isVisible ? 'bi-eye-slash' : 'bi-eye' %>"></i>
+                            </button>
 
                             <!-- Image Update Trigger (Modal or Popover ideal, avoiding complex JS for now, using simple input toggle or a compact inline form) -->
                             <!-- Using a simple inline form for image URL for now -->
-                            <!-- Edit Details (Category & Image) -->
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
-                                    data-bs-toggle="dropdown" title="Edit Details">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <div class="dropdown-menu p-3" style="min-width: 300px;">
-                                    <form action="/admin/books/<%= book.id %>/update" method="POST">
-                                        <div class="mb-2">
-                                            <label class="form-label">Category</label>
-                                            <select name="categoryId" class="form-select form-select-sm">
-                                                <% categories.forEach(cat=> { %>
-                                                    <option value="<%= cat.id %>" <%=book.categoryId===cat.id
-                                                        ? 'selected' : '' %>>
-                                                        <%= cat.name %>
-                                                    </option>
-                                                    <% }) %>
-                                            </select>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label">Image URL</label>
-                                            <input type="text" name="imageUrl" class="form-control form-control-sm"
-                                                value="<%= book.imageUrl %>">
-                                        </div>
-                                        <button type="submit" class="btn btn-primary btn-sm w-100">Save Changes</button>
-                                    </form>
-                                </div>
+                            <!-- Edit Trigger -->
+                            <button type="button" class="btn btn-sm btn-outline-primary edit-book-btn"
+                                data-id="<%= book.id %>" data-title="<%= book.title %>" data-author="<%= book.author %>"
+                                data-price="<%= book.price %>" data-category-id="<%= book.categoryId %>"
+                                data-image="<%= book.imageUrl %>" data-stock="<%= book.stock %>"
+                                data-is-visible="<%= book.isVisible %>"
+                                data-created-at="<%= new Date(book.createdAt).toLocaleString() %>"
+                                data-updated-at="<%= new Date(book.updatedAt).toLocaleString() %>">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <!-- Hidden Description to avoid Quote/Newline attribute issues -->
+                            <div id="desc-<%= book.id %>" class="d-none">
+                                <%= book.description %>
                             </div>
-
-                            <!-- Delete -->
-                            <form action="/admin/books/<%= book.id %>/delete" method="POST" class="d-inline"
-                                onsubmit="return confirm('Are you sure? This cannot be undone.');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Book">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
                         </div>
                     </td>
                 </tr>
@@ -177,4 +158,309 @@
         <% } %>
 
             <a href="/admin" class="btn btn-secondary mt-3">Back to Dashboard</a>
-</div>
+
+            <!-- Draggable Edit Modal -->
+            <div class="modal fade" id="editBookModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered modal-lg" style="min-width: 600px;">
+                    <div class="modal-content" style="min-height: 500px;">
+                        <div class="modal-header bg-dark text-white" style="cursor: move;">
+                            <h5 class="modal-title">Edit Book</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="updateBookForm" method="POST">
+                                <input type="hidden" id="modalBookId" value="">
+                                <div class="modal-body">
+                                    <div class="row g-3">
+                                        <!-- Left Column: Image -->
+                                        <div class="col-md-4 text-center">
+                                            <img id="modalBookThumbnail" src="" alt="Cover"
+                                                class="img-fluid rounded shadow mb-2" style="max-height: 250px;">
+                                            <div class="small text-muted mb-1">Created: <span
+                                                    id="modalCreatedAt"></span>
+                                            </div>
+                                            <div class="small text-muted">Updated: <span id="modalUpdatedAt"></span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Right Column: Details -->
+                                        <div class="col-md-8">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Title</label>
+                                                <input type="text" id="modalBookTitle" class="form-control" disabled
+                                                    readonly>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Author</label>
+                                                <input type="text" id="modalBookAuthor" class="form-control" disabled
+                                                    readonly>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Description</label>
+                                                <textarea name="description" id="modalBookDescription"
+                                                    class="form-control" rows="3"></textarea>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label fw-bold">Category</label>
+                                                    <select name="categoryId" id="modalBookCategory"
+                                                        class="form-select">
+                                                        <% categories.forEach(cat=> { %>
+                                                            <option value="<%= cat.id %>">
+                                                                <%= cat.name %>
+                                                            </option>
+                                                            <% }) %>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label fw-bold">Price ($)</label>
+                                                    <input type="number" name="price" id="modalBookPrice"
+                                                        class="form-control" step="0.01" min="0">
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label fw-bold">Stock</label>
+                                                    <input type="number" name="stock" id="modalBookStock"
+                                                        class="form-control" min="0">
+                                                </div>
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label fw-bold">Image URL</label>
+                                                    <input type="text" name="imageUrl" id="modalBookImage"
+                                                        class="form-control">
+                                                </div>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" name="isVisible"
+                                                    id="modalBookVisible">
+                                                <label class="form-check-label fw-bold" for="modalBookVisible">Book is
+                                                    Visible</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer justify-content-between">
+                                    <button type="button" id="btnDeleteBook" class="btn btn-danger">Delete</button>
+                                    <button type="submit" class="btn btn-primary">Update Book</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const editModalEl = document.getElementById('editBookModal');
+                        const editModal = new bootstrap.Modal(editModalEl);
+                        const updateForm = document.getElementById('updateBookForm');
+                        const btnDelete = document.getElementById('btnDeleteBook');
+                        const btnUpdate = document.querySelector('button[form="updateBookForm"]') || updateForm.querySelector('.btn-primary');
+
+                        // --- AJAX Update Logic ---
+                        if (btnUpdate) {
+                            btnUpdate.type = 'button'; // Prevent default submit
+                            btnUpdate.addEventListener('click', async function () {
+                                const formData = new FormData(updateForm);
+                                const data = Object.fromEntries(formData.entries());
+
+                                // Explicitly get description value to be safe
+                                const descVal = document.getElementById('modalBookDescription').value;
+                                data.description = descVal;
+
+                                // Checkbox handling
+                                data.isVisible = document.getElementById('modalBookVisible').checked ? 'on' : 'off';
+
+                                try {
+                                    const response = await fetch(updateForm.action, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json',
+                                            'X-Requested-With': 'XMLHttpRequest'
+                                        },
+                                        body: JSON.stringify(data)
+                                    });
+
+                                    const result = await response.json();
+
+                                    if (result.success) {
+                                        window.location.reload();
+                                    } else {
+                                        alert('Update failed: ' + (result.error || 'Unknown error'));
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                    alert('Error updating book: ' + err.message);
+                                }
+                            });
+                        }
+
+                        // --- Populate Modal ---
+                        document.querySelectorAll('.edit-book-btn').forEach(btn => {
+                            btn.addEventListener('click', function () {
+                                const ds = this.dataset;
+
+                                // Set Form Actions
+                                updateForm.action = `/admin/books/${ds.id}/update`;
+
+                                // Set Hidden ID for DOM Update
+                                document.getElementById('modalBookId').value = ds.id;
+
+                                // Store ID for delete
+                                btnDelete.dataset.deleteUrl = `/admin/books/${ds.id}/delete`;
+
+                                // Set Values
+                                document.getElementById('modalBookTitle').value = ds.title;
+                                document.getElementById('modalBookAuthor').value = ds.author;
+
+                                // Read description from hidden div (safer for quotes/newlines)
+                                const descEl = document.getElementById(`desc-${ds.id}`);
+                                document.getElementById('modalBookDescription').value = descEl ? descEl.textContent.trim() : '';
+
+                                document.getElementById('modalBookStock').value = ds.stock;
+                                document.getElementById('modalBookCategory').value = ds.categoryId;
+                                document.getElementById('modalBookPrice').value = ds.price;
+                                document.getElementById('modalBookImage').value = ds.image;
+                                document.getElementById('modalBookThumbnail').src = ds.image;
+
+                                document.getElementById('modalCreatedAt').textContent = ds.createdAt;
+                                document.getElementById('modalUpdatedAt').textContent = ds.updatedAt;
+
+                                // Handle Checkbox
+                                document.getElementById('modalBookVisible').checked = (ds.isVisible === 'true');
+
+                                editModal.show();
+                            });
+                        });
+
+                        // --- Delete Logic ---
+                        btnDelete.addEventListener('click', async function () {
+                            const url = this.dataset.deleteUrl;
+                            if (url && confirm('Are you sure you want to delete this book? This cannot be undone.')) {
+                                try {
+                                    const response = await fetch(url, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Accept': 'application/json',
+                                            'X-Requested-With': 'XMLHttpRequest'
+                                        }
+                                    });
+
+                                    const result = await response.json();
+
+                                    if (result.success) {
+                                        const bookId = document.getElementById('modalBookId').value;
+                                        const row = document.getElementById('tr-' + bookId);
+                                        if (row) {
+                                            row.remove(); // Remove the row from the table
+                                        }
+                                        editModal.hide(); // Hide the modal
+                                        // Optional: Show a success toast
+                                    } else {
+                                        alert('Delete failed: ' + (result.error || 'Unknown error'));
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                    alert('Error deleting book: ' + err.message);
+                                }
+                            }
+                        });
+
+                        // --- Draggable Logic ---
+                        const modalDialog = editModalEl.querySelector('.modal-dialog');
+                        const modalHeader = editModalEl.querySelector('.modal-header');
+
+                        let isDragging = false;
+                        let startX, startY;
+                        let startLeft, startTop;
+
+                        modalHeader.addEventListener('mousedown', function (e) {
+                            if (e.button !== 0 || e.target.closest('.btn-close')) return;
+
+                            isDragging = true;
+                            startX = e.clientX;
+                            startY = e.clientY;
+
+                            const style = window.getComputedStyle(modalDialog);
+                            const matrix = new WebKitCSSMatrix(style.transform);
+                            startLeft = matrix.m41;
+                            startTop = matrix.m42;
+
+                            modalHeader.style.cursor = 'grabbing';
+                        });
+
+                        window.addEventListener('mousemove', function (e) {
+                            if (!isDragging) return;
+                            e.preventDefault();
+
+                            const dx = e.clientX - startX;
+                            const dy = e.clientY - startY;
+
+                            modalDialog.style.transform = `translate(${startLeft + dx}px, ${startTop + dy}px)`;
+                        });
+
+                        window.addEventListener('mouseup', function () {
+                            if (isDragging) {
+                                isDragging = false;
+                                modalHeader.style.cursor = 'move';
+                            }
+                        });
+
+                        // --- AJAX Visibility Toggle ---
+                        document.querySelectorAll('.btn-toggle-visibility').forEach(btn => {
+                            btn.addEventListener('click', async function () {
+                                const bookId = this.dataset.id;
+                                const currentVisible = this.dataset.visible === 'true';
+
+                                try {
+                                    const response = await fetch(`/admin/books/${bookId}/toggle`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Accept': 'application/json',
+                                            'X-Requested-With': 'XMLHttpRequest'
+                                        }
+                                    });
+
+                                    const result = await response.json();
+
+                                    if (result.success) {
+                                        // Toggle UI State
+                                        const newVisible = !currentVisible;
+                                        this.dataset.visible = newVisible;
+
+                                        // Update Button
+                                        const icon = this.querySelector('i');
+                                        this.className = `btn btn-sm ${newVisible ? 'btn-outline-success' : 'btn-outline-warning'} btn-toggle-visibility`;
+                                        this.title = newVisible ? 'Hide Book' : 'Show Book';
+                                        icon.className = `bi ${newVisible ? 'bi-eye' : 'bi-eye-slash'}`;
+
+                                        // Update Badge (find specific row)
+                                        const row = document.getElementById(`tr-${bookId}`);
+                                        if (row) {
+                                            // Look for the cell containing the badge. Usually index 5.
+                                            // To be safe, look for the cell with a badge.
+                                            const badge = row.querySelector('.badge');
+                                            if (badge) {
+                                                if (newVisible) {
+                                                    badge.className = 'badge bg-success';
+                                                    badge.textContent = 'Visible';
+                                                } else {
+                                                    badge.className = 'badge bg-warning text-dark';
+                                                    badge.textContent = 'Hidden';
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        console.error('Toggle failed');
+                                        alert('Failed to toggle visibility: ' + (result.error || 'Unknown error'));
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                    alert('Error: ' + err.message);
+                                }
+                            });
+                        });
+                    });
+                </script>
+            </div>

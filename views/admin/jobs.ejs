@@ -1,32 +1,163 @@
-<div class="container mt-4">
-    <h2>Background Jobs</h2>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h4 class="card-title text-primary"><i class="fas fa-sync-alt me-2"></i>Trigger New Import</h4>
+                <p class="text-muted small">Import books from Google Books API.</p>
+                <form action="/admin/jobs/trigger" method="POST" class="d-flex gap-2">
+                    <input type="text" name="query" class="form-control"
+                        placeholder="Search Query (e.g. subject:history)" required style="max-width: 300px;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-cloud-download-alt me-2"></i>Run Import Job
+                    </button>
+                </form>
+                <form action="/admin/jobs/fix-data" method="POST" class="d-inline-block ms-2">
+                    <button type="submit" class="btn btn-outline-warning"
+                        title="Find and fix missing descriptions or images">
+                        <i class="fas fa-magic me-2"></i>Fix Data
+                    </button>
+                </form>
+                <% if (typeof message !=='undefined' ) { %>
+                    <div class="alert alert-info mt-3 mb-0 py-2">
+                        <%= message %>
+                    </div>
+                    <% } %>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <% if (locals.message) { %>
-        <div class="alert alert-info">
-            <%= message %>
+<h4 class="mb-3 text-secondary"><i class="fas fa-history me-2"></i>Import History</h4>
+
+<% if (jobs && jobs.length> 0) { %>
+    <div class="d-flex flex-column gap-4">
+        <% jobs.forEach(job=> { %>
+            <div class="card shadow-sm border-0">
+                <div class="card-header border-bottom-0 pt-3 pb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-3">
+                            <span
+                                class="status-indicator <%= job.status === 'completed' ? 'bg-success' : (job.status === 'running' ? 'bg-warning' : 'bg-danger') %>"></span>
+                            <span class="fw-bold fs-5">
+                                <%= job.status.charAt(0).toUpperCase() + job.status.slice(1) %>
+                            </span>
+                            <span class="text-muted small">
+                                <i class="fas fa-clock me-1"></i>
+                                <%= new Date(job.startTime).toLocaleString() %>
+                            </span>
+                            <span class="fw-bold ms-2">
+                                <%= job.booksAdded %> Books Added
+                            </span>
+                        </div>
+                        <div class="text-end text-muted small d-flex align-items-center gap-3">
+                            <div>
+                                Import Type: <strong>
+                                    <% if (job.type==='manual_import' ) { %>
+                                        <i class="fas fa-cloud-download-alt text-primary me-1"></i>
+                                        <% } else if (job.type==='data_fix' ) { %>
+                                            <i class="fas fa-magic text-warning me-1"></i>
+                                            <% } else if (job.type==='cron_import' ) { %>
+                                                <i class="fas fa-clock text-info me-1"></i>
+                                                <% } else { %>
+                                                    <i class="fas fa-file-import text-secondary me-1"></i>
+                                                    <% } %>
+                                                        <%= job.type %>
+                                </strong>
+                            </div>
+                            <% if (job.status==='running' ) { %>
+                                <form action="/admin/jobs/<%= job.id %>/stop" method="POST" class="m-0">
+                                    <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3">
+                                        <i class="fas fa-stop-circle me-1"></i>Stop
+                                    </button>
+                                </form>
+                                <% } %>
+                        </div>
+                    </div>
+                    <% if (job.summary) { %>
+                        <div class="text-muted small mt-1 ps-1 border-start border-3 border-light">
+                            <%= job.summary %>
+                        </div>
+                        <% } %>
+                </div>
+
+                <div class="card-body border-top">
+                    <% if (job.Books && job.Books.length> 0) { %>
+                        <h6 class="text-muted small text-uppercase fw-bold mb-3">Recently Added Books</h6>
+                        <div class="d-flex gap-3 overflow-auto pb-2" style="scrollbar-width: thin;">
+                            <% job.Books.forEach(book=> { %>
+                                <div class="card border-0 shadow-sm book-thumbnail"
+                                    style="min-width: 100px; max-width: 100px; cursor: pointer;" data-bs-toggle="modal"
+                                    data-bs-target="#bookDetailModal" data-title="<%= book.title %>"
+                                    data-authors="<%= book.author %>" data-description="<%= book.description %>"
+                                    data-image="<%= book.imageUrl %>">
+                                    <img src="<%= book.imageUrl %>" class="card-img-top" alt="<%= book.title %>"
+                                        style="height: 140px; object-fit: cover;">
+                                    <div class="card-body p-1 text-center">
+                                        <div class="text-truncate small fw-bold" title="<%= book.title %>">
+                                            <%= book.title %>
+                                        </div>
+                                    </div>
+                                </div>
+                                <% }); %>
+                        </div>
+                        <% } else { %>
+                            <div class="text-center text-muted py-3 small">
+                                No books recorded for this job (or details expired).
+                            </div>
+                            <% } %>
+                </div>
+            </div>
+            <% }); %>
+    </div>
+    <% } else { %>
+        <div class="alert alert-secondary text-center">
+            No job history available. Run an import to see results here.
         </div>
         <% } %>
 
-            <div class="card mt-3">
-                <div class="card-header">
-                    Book Ingestion
-                </div>
-                <div class="card-body">
-                    <h5 class="card-title">Google Books API Import</h5>
-                    <p class="card-text">Fetch new books from Google Books API. Standard job runs twice daily.</p>
-
-                    <form action="/admin/jobs/trigger" method="POST">
-                        <div class="mb-3">
-                            <label for="query" class="form-label">Search Query (Optional)</label>
-                            <input type="text" class="form-control" id="query" name="query"
-                                placeholder="e.g. subject:history">
+            <!-- Book Detail Modal -->
+            <div class="modal fade" id="bookDetailModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header border-0 pb-0">
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <button type="submit" class="btn btn-warning">Trigger Job Now</button>
-                    </form>
+                        <div class="modal-body">
+                            <div class="d-flex gap-4">
+                                <img id="modalBookImage" src="" alt="Book Cover" class="shadow rounded"
+                                    style="width: 120px; height: 180px; object-fit: cover;">
+                                <div class="flex-grow-1">
+                                    <h5 id="modalBookTitle" class="fw-bold mb-1"></h5>
+                                    <p id="modalBookAuthors" class="text-primary mb-2"></p>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <h6 class="fw-bold small text-uppercase text-muted">Description</h6>
+                                <p id="modalBookDescription" class="small text-muted"
+                                    style="max-height: 200px; overflow-y: auto;"></p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="mt-3">
-                <a href="/admin" class="btn btn-secondary">Back to Dashboard</a>
-            </div>
-</div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const bookModal = document.getElementById('bookDetailModal');
+                    bookModal.addEventListener('show.bs.modal', function (event) {
+                        const card = event.relatedTarget;
+
+                        // Extract info from data-* attributes
+                        const title = card.getAttribute('data-title');
+                        const authors = card.getAttribute('data-authors');
+                        const description = card.getAttribute('data-description');
+                        const imageUrl = card.getAttribute('data-image');
+
+                        // Update the modal's content.
+                        bookModal.querySelector('#modalBookTitle').textContent = title;
+                        bookModal.querySelector('#modalBookAuthors').textContent = authors;
+                        bookModal.querySelector('#modalBookDescription').textContent = description || 'No description available.';
+                        bookModal.querySelector('#modalBookImage').src = imageUrl;
+                    });
+                });
+            </script>
