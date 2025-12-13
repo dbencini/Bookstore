@@ -6,7 +6,11 @@ const router = express.Router();
 // Home / Books Listing
 router.get('/books', async (req, res) => {
     const { search, category } = req.query;
-    let whereClause = { isVisible: true }; // Add this line to filter by isVisible: true
+    const page = parseInt(req.query.page) || 1;
+    const limit = 8; // Number of books per page
+    const offset = (page - 1) * limit;
+
+    let whereClause = { isVisible: true };
     if (search) {
         whereClause[Op.or] = [
             { title: { [Op.like]: `%${search}%` } },
@@ -18,8 +22,22 @@ router.get('/books', async (req, res) => {
     }
 
     try {
-        const books = await Book.findAll({ where: whereClause });
-        res.render('index', { books, search });
+        const { count, rows: books } = await Book.findAndCountAll({
+            where: whereClause,
+            limit,
+            offset,
+            order: [['createdAt', 'DESC']] // Optional: default sort
+        });
+
+        const totalPages = Math.ceil(count / limit);
+
+        res.render('index', {
+            books,
+            search,
+            category,
+            currentPage: page,
+            totalPages
+        });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');

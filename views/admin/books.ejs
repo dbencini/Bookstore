@@ -78,6 +78,7 @@
                 <th>Price</th>
                 <th>Category</th>
                 <th>Date Added</th>
+                <th>Updated At</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -104,6 +105,9 @@
                     </td>
                     <td>
                         <%= new Date(book.createdAt).toLocaleDateString() %>
+                    </td>
+                    <td>
+                        <%= new Date(book.updatedAt).toLocaleDateString() %>
                     </td>
                     <td>
                         <% if (book.isVisible) { %>

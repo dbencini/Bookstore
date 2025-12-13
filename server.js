@@ -6,7 +6,7 @@ const LocalStrategy = require('passport-local').Strategy;
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const SQLiteStore = require('connect-sqlite3')(session);
 const path = require('path');
-const { sequelize, User, UserType, SiteConfig, Category } = require('./models');
+const { sequelize, User, UserType, SiteConfig, Category, FooterSetting } = require('./models');
 const expressLayouts = require('express-ejs-layouts');
 const adminRoutes = require('./routes/admin');
 const { startCronJob } = require('./services/bookService');
@@ -133,9 +133,21 @@ app.use(async (req, res, next) => {
 });
 
 // Middleware to pass user details to views
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
     res.locals.user = req.user;
     res.locals.title = res.locals.siteConfig ? res.locals.siteConfig.appName : 'Bookstore';
+
+    try {
+        let footerSettings = await FooterSetting.findOne();
+        if (!footerSettings) {
+            footerSettings = await FooterSetting.create({});
+        }
+        res.locals.footerSettings = footerSettings;
+    } catch (err) {
+        console.error('Error loading footer settings:', err);
+        res.locals.footerSettings = {};
+    }
+
     next();
 });
 

@@ -39,3 +39,35 @@
                 </div>
                 <% }) %>
 </div>
+
+<!-- Pagination Controls -->
+<% if (totalPages> 1) { %>
+    <div class="admin-panel-dark p-2 rounded mt-4">
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                <!-- Previous Button -->
+                <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                    <a class="page-link"
+                        href="/books?page=<%= currentPage - 1 %>&search=<%= search || '' %>&category=<%= category || '' %>"
+                        tabindex="-1">Previous</a>
+                </li>
+
+                <!-- Page Numbers -->
+                <% for(let i=1; i <=totalPages; i++) { %>
+                    <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                        <a class="page-link"
+                            href="/books?page=<%= i %>&search=<%= search || '' %>&category=<%= category || '' %>">
+                            <%= i %>
+                        </a>
+                    </li>
+                    <% } %>
+
+                        <!-- Next Button -->
+                        <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                            <a class="page-link"
+                                href="/books?page=<%= currentPage + 1 %>&search=<%= search || '' %>&category=<%= category || '' %>">Next</a>
+                        </li>
+            </ul>
+        </nav>
+    </div>
+    <% } %>

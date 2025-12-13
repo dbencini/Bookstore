@@ -59,6 +59,18 @@ Pagination *must* be wrapped in `.admin-panel-dark` to trigger specific override
 -   **Active**: Lighter Gray (`#495057`) - *No Blue*.
 -   **Text**: White (`#f8f9fa`).
 
+#### D. Form Controls
+Inputs, Selects, and Textareas within `.admin-panel-dark` must maintain readability in both Light and Dark modes.
+-   **Light Mode**:
+    -   Background: White (`#ffffff`)
+    -   Text: Dark Gray (`#212529`)
+    -   Border: Light Gray (`#ced4da`)
+-   **Dark Mode**:
+    -   Background: *Darker* Gray (`#343a40`) - Distinct from card body (`#454d55`).
+    -   Text: Very Light Gray (`#e0e0e0`)
+    -   Border: Dark Gray (`#565e64`)
+    -   Focus: Slightly lighter background (`#2b3035`) with blue border (`#86b7fe`).
+
 ## 2. Server-Side Functionality
 
 All grids must implement efficient server-side operations.
@@ -79,6 +91,21 @@ All grids must implement efficient server-side operations.
     -   **Text**: `[Op.like]: '%value%'` (Case-insensitive via collation or `LOWER()`).
     -   **Dictionary (Categories)**: Filter by associated model name.
     -   **Dates**: `[Op.gte]` / `[Op.lte]` (Start/End range).
+
+### Data Integrity & Display Rules (Standardization)
+-   **UUIDs**: ALWAYS hide UUID/ID columns in the data grid. They should not be visible to the user.
+
+### Standard Grid Layout
+- **Sorting**: Default sort should be by `Updated At` (Descending) to ensure recently modified items appear first, followed by `Created At` (Descending).
+- **Columns**:
+    - **ID**: Should be hidden/removed.
+    - **Timestamps**: `Created At` and `Updated At` columns must be visible.
+    ```javascript
+    order: [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
+    ```
+-   **Timestamps**:
+    -   **Persistence**: If `createdAt` is null/empty on save, populate it. Always populate `updatedAt` on save. (Handled by ORM usually, but enforce if missing).
+    -   **Display**: If any capture screen or grid is missing `createdAt` or `updatedAt`, add them as **display-only** fields.
 
 ### View Implementation
 -   **Comboboxes**: Use `<select>` populated by dictionary tables (e.g., Categories) with `[data-theme="dark"]` compatible styles (SVG arrow overrides).
@@ -102,3 +129,8 @@ All grids must implement efficient server-side operations.
 -   **Method**: Submit via `fetch` to catch server errors (e.g., validation, session expired).
 -   **Completion**: On `success: true`, perform a **Full Page Reload** (`window.location.reload()`).
     -   *Rationale*: Ensures all related data (sums, sorting, counters) are 100% accurate without complex client-side state management.
+
+#### D. Delete Actions
+- **Placement**: "Delete" buttons for main entities (Books, Categories, Users) must be placed inside the **Edit Modal** (bottom left, red), NOT in the data grid.
+- **Grid**: The grid should only contain "Edit" (pencil) and "Toggle/View" type actions.
+

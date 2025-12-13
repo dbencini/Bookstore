@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, UserType, Book, Category, Job } = require('../models');
+const { User, UserType, Book, Category, Job, FooterSetting } = require('../models');
 // ...
 
 // Book Management
@@ -69,7 +69,7 @@ router.get('/users', async (req, res) => {
             include: { model: UserType },
             limit,
             offset,
-            order: [['createdAt', 'DESC']]
+            order: [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
         });
 
         const userTypes = await UserType.findAll();
@@ -151,7 +151,7 @@ router.get('/books', async (req, res) => {
             include,
             limit,
             offset,
-            order: [['createdAt', 'DESC']]
+            order: [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
         });
 
         // Fetch categories for combobox in Edit modal (and potential filter dropdown if needed later)
@@ -311,6 +311,124 @@ router.post('/jobs/:id/stop', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.redirect('/admin/jobs?error=StopFailed');
+    }
+});
+
+// Footer Settings Management
+router.get('/settings', async (req, res) => {
+    try {
+        let settings = await FooterSetting.findOne();
+        if (!settings) {
+            settings = await FooterSetting.create({});
+        }
+        res.render('admin/social_settings', {
+            page: 'settings',
+            settings
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+});
+
+router.post('/settings', async (req, res) => {
+    try {
+        let settings = await FooterSetting.findOne();
+        if (!settings) {
+            settings = await FooterSetting.create({});
+        }
+
+        const { facebookUrl, twitterUrl, instagramUrl, linkedinUrl, youtubeUrl } = req.body;
+
+        settings.facebookUrl = facebookUrl;
+        settings.twitterUrl = twitterUrl;
+        settings.instagramUrl = instagramUrl;
+        settings.linkedinUrl = linkedinUrl;
+        settings.youtubeUrl = youtubeUrl;
+
+        await settings.save();
+
+        res.redirect('/admin/settings?success=true');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/settings?error=UpdateFailed');
+    }
+});
+
+// Category Maintenance
+router.get('/categories', async (req, res) => {
+    try {
+        const { page = 1, search = '' } = req.query;
+        const limit = 12;
+        const offset = (page - 1) * limit;
+        const { Op } = require('sequelize');
+
+        const where = {};
+        if (search) {
+            where.name = { [Op.like]: `%${search}%` };
+        }
+
+        const { count, rows } = await Category.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
+        });
+
+        const totalPages = Math.ceil(count / limit);
+
+        res.render('admin/categories', {
+            categories: rows,
+            totalCategories: count,
+            page: 'categories',
+            currentPage: parseInt(page),
+            totalPages,
+            search
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+});
+
+// Category Update/Create Routes (Minimal Implementation for Modal)
+router.post('/categories/create', async (req, res) => {
+    try {
+        await Category.create({ name: req.body.name });
+        res.redirect('/admin/categories');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/categories?error=CreateFailed');
+    }
+});
+
+router.post('/categories/:id/update', async (req, res) => {
+    try {
+        const category = await Category.findByPk(req.params.id);
+        if (category) {
+            category.name = req.body.name;
+            await category.save();
+        }
+        res.redirect('/admin/categories');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/categories?error=UpdateFailed');
+    }
+});
+
+router.post('/categories/:id/delete', async (req, res) => {
+    try {
+        await Category.destroy({ where: { id: req.params.id } });
+        if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+            return res.json({ success: true });
+        }
+        res.redirect('/admin/categories');
+    } catch (err) {
+        console.error(err);
+        if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        res.redirect('/admin/categories?error=DeleteFailed');
     }
 });
 

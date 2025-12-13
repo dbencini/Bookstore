@@ -32,6 +32,8 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
+                <th>Created At</th>
+                <th>Updated At</th>
                 <th>Password / Update</th>
             </tr>
         </thead>
@@ -53,6 +55,11 @@
                                 </option>
                                 <% }) %>
                         </select>
+                    <td>
+                        <%= new Date(u.createdAt).toLocaleDateString() %>
+                    </td>
+                    <td>
+                        <%= new Date(u.updatedAt).toLocaleDateString() %>
                     </td>
                     <td>
                         <form id="update-form-<%= u.id %>" action="/admin/users/<%= u.id %>/update" method="POST">

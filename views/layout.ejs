@@ -24,6 +24,18 @@
             cursor: pointer;
             user-select: none;
         }
+
+        /* Hide scrollbar for clean horizontal scrolling */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            /* IE and Edge */
+            scrollbar-width: none;
+            /* Firefox */
+        }
     </style>
 </head>
 
@@ -31,11 +43,8 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 text-center">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <% if (locals.siteConfig && locals.siteConfig.logoUrl) { %>
-                    <img src="<%= locals.siteConfig.logoUrl %>" alt="<%= locals.siteConfig.appName %>" height="45"
-                        class="d-inline-block align-middle me-2">
-                    <% } %>
-                        <%= locals.siteConfig ? locals.siteConfig.appName : 'My Bookstore' %>
+                <img src="/images/logo_v2.svg" alt="My Bookstore" height="40" class="d-inline-block align-middle me-2">
+                My Bookstore
             </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav ms-auto align-items-center">
@@ -69,17 +78,20 @@
     </nav>
 
     <!-- Category Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 p-0">
-        <div class="container">
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#categoryNav">
-                <span class="navbar-toggler-icon"></span>
+    <nav class="navbar navbar-dark bg-dark mb-4 p-0">
+        <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap">
+            <button class="btn btn-link text-white p-0 flex-shrink-0"
+                onclick="document.getElementById('cat-scroll-container').scrollBy({left: -document.getElementById('cat-scroll-container').clientWidth, behavior: 'smooth'})">
+                <i class="fas fa-chevron-left fa-lg"></i>
             </button>
-            <div class="collapse navbar-collapse justify-content-center" id="categoryNav">
-                <ul class="navbar-nav">
+            <div id="cat-scroll-container" class="overflow-auto no-scrollbar py-2 mx-5"
+                style="white-space: nowrap; flex-grow: 1; min-width: 0;">
+                <ul class="nav flex-nowrap">
                     <% if (locals.categories && locals.categories.length> 0) { %>
                         <% locals.categories.forEach(category=> { %>
                             <li class="nav-item">
-                                <a class="nav-link text-white text-uppercase fw-bold px-3"
+                                <a class="nav-link text-white px-3 small"
+                                    style="white-space: nowrap; font-size: 0.9rem;"
                                     href="/books?category=<%= encodeURIComponent(category.name) %>">
                                     <%= category.name %>
                                 </a>
@@ -88,6 +100,10 @@
                                 <% } %>
                 </ul>
             </div>
+            <button class="btn btn-link text-white p-0 flex-shrink-0"
+                onclick="document.getElementById('cat-scroll-container').scrollBy({left: document.getElementById('cat-scroll-container').clientWidth, behavior: 'smooth'})">
+                <i class="fas fa-chevron-right fa-lg"></i>
+            </button>
         </div>
     </nav>
 
@@ -139,6 +155,57 @@
     <div class="container">
         <%- body %>
     </div>
+
+    <!-- Footer -->
+    <footer class="text-center text-lg-start mt-5 pt-4 pb-4 border-top">
+        <div class="container">
+            <section class="mb-4 text-center">
+                <% if (locals.footerSettings) { %>
+                    <% if (locals.footerSettings.facebookUrl) { %>
+                        <a class="btn btn-outline-secondary btn-floating m-1 rounded-circle"
+                            href="<%= locals.footerSettings.facebookUrl %>" target="_blank" role="button">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                        <% } %>
+
+                            <% if (locals.footerSettings.twitterUrl) { %>
+                                <a class="btn btn-outline-secondary btn-floating m-1 rounded-circle"
+                                    href="<%= locals.footerSettings.twitterUrl %>" target="_blank" role="button">
+                                    <i class="fab fa-twitter"></i>
+                                </a>
+                                <% } %>
+
+                                    <% if (locals.footerSettings.instagramUrl) { %>
+                                        <a class="btn btn-outline-secondary btn-floating m-1 rounded-circle"
+                                            href="<%= locals.footerSettings.instagramUrl %>" target="_blank"
+                                            role="button">
+                                            <i class="fab fa-instagram"></i>
+                                        </a>
+                                        <% } %>
+
+                                            <% if (locals.footerSettings.linkedinUrl) { %>
+                                                <a class="btn btn-outline-secondary btn-floating m-1 rounded-circle"
+                                                    href="<%= locals.footerSettings.linkedinUrl %>" target="_blank"
+                                                    role="button">
+                                                    <i class="fab fa-linkedin-in"></i>
+                                                </a>
+                                                <% } %>
+
+                                                    <% if (locals.footerSettings.youtubeUrl) { %>
+                                                        <a class="btn btn-outline-secondary btn-floating m-1 rounded-circle"
+                                                            href="<%= locals.footerSettings.youtubeUrl %>"
+                                                            target="_blank" role="button">
+                                                            <i class="fab fa-youtube"></i>
+                                                        </a>
+                                                        <% } %>
+                                                            <% } %>
+            </section>
+            <div class="text-center text-muted">
+                © <%= new Date().getFullYear() %>
+                    <%= locals.siteConfig ? locals.siteConfig.appName : 'Bookstore' %>. All rights reserved.
+            </div>
+        </div>
+    </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const themeToggle = document.getElementById('theme-toggle');

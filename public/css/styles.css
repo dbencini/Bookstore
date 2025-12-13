@@ -201,15 +201,40 @@ label,
 /* Admin Card Body Theme Logic */
 .admin-panel-dark .card-body {
     background-color: #f8f9fa !important;
-    /* Very Light Gray for Light Mode */
     color: #212529 !important;
-    /* Dark text for Light Mode */
 }
 
 [data-theme="dark"] .admin-panel-dark .card-body {
-    background-color: #454d55 !important;
-    /* Lighter Dark Gray for Dark Mode */
-    color: #e0e0e0 !important;
+    background-color: var(--card-bg) !important;
+    /* Use consistent card bg */
+    color: var(--text-color) !important;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Admin Panel Form Controls */
+.admin-panel-dark .form-control,
+.admin-panel-dark .input-group-text,
+.admin-panel-dark .form-select {
+    background-color: #fff;
+    border-color: #ced4da;
+    color: #212529;
+}
+
+[data-theme="dark"] .admin-panel-dark .form-control,
+[data-theme="dark"] .admin-panel-dark .input-group-text,
+[data-theme="dark"] .admin-panel-dark .form-select {
+    background-color: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--input-text) !important;
+}
+
+[data-theme="dark"] .admin-panel-dark .form-control:focus,
+[data-theme="dark"] .admin-panel-dark .form-select:focus {
+    background-color: var(--input-bg) !important;
+    /* Keep same as input bg */
+    border-color: #86b7fe !important;
+    color: var(--input-text) !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 /* Modal Dark Mode */

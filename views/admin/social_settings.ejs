@@ -1,0 +1,76 @@
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Footer Social Settings</h1>
+        <a href="/admin" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+
+    <% if (typeof settings==='undefined' ) { %>
+        <div class="alert alert-danger">Error loading settings.</div>
+        <% } else { %>
+
+            <div class="card admin-panel-dark">
+                <div class="card-header">
+                    <span class="fw-bold">Manage Social Media Links</span>
+                </div>
+                <div class="card-body">
+                    <form action="/admin/settings" method="POST">
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="facebookUrl" class="form-label">Facebook URL</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fab fa-facebook-f"></i></span>
+                                    <input type="url" class="form-control" id="facebookUrl" name="facebookUrl"
+                                        value="<%= settings.facebookUrl %>" placeholder="https://facebook.com/yourpage">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="twitterUrl" class="form-label">Twitter / X URL</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fab fa-twitter"></i></span>
+                                    <input type="url" class="form-control" id="twitterUrl" name="twitterUrl"
+                                        value="<%= settings.twitterUrl %>" placeholder="https://twitter.com/yourhandle">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="instagramUrl" class="form-label">Instagram URL</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fab fa-instagram"></i></span>
+                                    <input type="url" class="form-control" id="instagramUrl" name="instagramUrl"
+                                        value="<%= settings.instagramUrl %>"
+                                        placeholder="https://instagram.com/yourprofile">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="linkedinUrl" class="form-label">LinkedIn URL</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fab fa-linkedin-in"></i></span>
+                                    <input type="url" class="form-control" id="linkedinUrl" name="linkedinUrl"
+                                        value="<%= settings.linkedinUrl %>"
+                                        placeholder="https://linkedin.com/in/yourprofile">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="youtubeUrl" class="form-label">YouTube URL</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fab fa-youtube"></i></span>
+                                    <input type="url" class="form-control" id="youtubeUrl" name="youtubeUrl"
+                                        value="<%= settings.youtubeUrl %>"
+                                        placeholder="https://youtube.com/yourchannel">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                            <a href="/admin" class="btn btn-outline-light ms-2">Cancel</a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+            <% } %>
+</div>

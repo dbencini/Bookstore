@@ -7,6 +7,7 @@ const Order = require('./Order');
 const SiteConfig = require('./SiteConfig');
 const Category = require('./Category');
 const Job = require('./Job');
+const FooterSetting = require('./FooterSetting');
 
 // Associations
 UserType.hasMany(User, { foreignKey: 'userTypeId' });
@@ -37,5 +38,6 @@ module.exports = {
     SiteConfig,
     SiteConfig,
     Category,
-    Job
+    Job,
+    FooterSetting
 };

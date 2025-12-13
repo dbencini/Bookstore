@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Minimalist Book Icon -->
+  <!-- Back Cover / Shadow (Blue) -->
+  <path d="M15 30 C 15 30, 35 40, 50 40 C 65 40, 85 30, 85 30 L 85 70 C 85 70, 65 80, 50 80 C 35 80, 15 70, 15 70 Z" fill="#0d6efd"/>
+  
+  <!-- Pages (White) -->
+  <path d="M18 33 C 18 33, 36 42, 50 42 C 64 42, 82 33, 82 33 L 82 66 C 82 66, 64 75, 50 75 C 36 75, 18 66, 18 66 Z" fill="#ffffff"/>
+  
+  <!-- Spine center (Blue accent) -->
+  <path d="M50 42 L 50 75" stroke="#e6f0ff" stroke-width="2" stroke-linecap="round"/>
+  
+   <!-- Page Curvature Hint (Blue accent) -->
+  <path d="M18 33 L 18 66" stroke="#0d6efd" stroke-width="1"/>
+  <path d="M82 33 L 82 66" stroke="#0d6efd" stroke-width="1"/>
+
+</svg>
