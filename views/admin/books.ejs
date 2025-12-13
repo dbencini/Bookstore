@@ -16,7 +16,7 @@
                 <i class="bi bi-funnel"></i> Toggle Filters
             </button>
         </div>
-        <div class="collapse <%= (filters && (filters.title || filters.author || filters.category || filters.startDate || filters.endDate)) ? 'show' : '' %>"
+        <div class="collapse <%= (filters && (filters.title || filters.author || filters.isbn || filters.category || filters.startDate || filters.endDate)) ? 'show' : '' %>"
             id="searchPanel">
             <div class="card-body">
                 <form action="/admin/books" method="GET" class="row g-3">
@@ -29,6 +29,11 @@
                         <label class="form-label">Author</label>
                         <input type="text" name="author" class="form-control form-control-sm"
                             value="<%= filters?.author || '' %>" placeholder="Contains...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">ISBN</label>
+                        <input type="text" name="isbn" class="form-control form-control-sm"
+                            value="<%= filters?.isbn || '' %>" placeholder="Contains...">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Category (Text)</label>
@@ -75,6 +80,7 @@
             <tr>
                 <th style="width: 80px;">Cover</th>
                 <th>Title / Author</th>
+                <th>ISBN</th>
                 <th>Price</th>
                 <th>Category</th>
                 <th>Date Added</th>
@@ -96,6 +102,9 @@
                         <small class="text-muted">
                             <%= book.author %>
                         </small>
+                    </td>
+                    <td>
+                        <%= book.isbn || '-' %>
                     </td>
                     <td>
                         $<%= book.price ? book.price.toFixed(2) : '0.00' %>
@@ -131,9 +140,9 @@
                             <!-- Edit Trigger -->
                             <button type="button" class="btn btn-sm btn-outline-primary edit-book-btn"
                                 data-id="<%= book.id %>" data-title="<%= book.title %>" data-author="<%= book.author %>"
-                                data-price="<%= book.price %>" data-category-id="<%= book.categoryId %>"
-                                data-image="<%= book.imageUrl %>" data-stock="<%= book.stock %>"
-                                data-is-visible="<%= book.isVisible %>"
+                                data-isbn="<%= book.isbn || '' %>" data-price="<%= book.price %>"
+                                data-category-id="<%= book.categoryId %>" data-image="<%= book.imageUrl %>"
+                                data-stock="<%= book.stock %>" data-is-visible="<%= book.isVisible %>"
                                 data-created-at="<%= new Date(book.createdAt).toLocaleString() %>"
                                 data-updated-at="<%= new Date(book.updatedAt).toLocaleString() %>">
                                 <i class="bi bi-pencil"></i>
@@ -156,19 +165,19 @@
                 <ul class="pagination justify-content-center mb-0">
                     <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
                         <a class="page-link"
-                            href="/admin/books?page=<%= currentPage - 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Previous</a>
+                            href="/admin/books?page=<%= currentPage - 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Previous</a>
                     </li>
                     <% for(let i=1; i <=totalPages; i++) { %>
                         <li class="page-item <%= currentPage === i ? 'active' : '' %>">
                             <a class="page-link"
-                                href="/admin/books?page=<%= i %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
+                                href="/admin/books?page=<%= i %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
                                 <%= i %>
                             </a>
                         </li>
                         <% } %>
                             <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
                                 <a class="page-link"
-                                    href="/admin/books?page=<%= currentPage + 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Next</a>
+                                    href="/admin/books?page=<%= currentPage + 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Next</a>
                             </li>
                 </ul>
             </nav>
@@ -213,6 +222,10 @@
                                                 <label class="form-label fw-bold">Author</label>
                                                 <input type="text" id="modalBookAuthor" class="form-control" disabled
                                                     readonly>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">ISBN</label>
+                                                <input type="text" name="isbn" id="modalBookIsbn" class="form-control">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label fw-bold">Description</label>
@@ -364,6 +377,7 @@
                                 // Set Values
                                 document.getElementById('modalBookTitle').value = ds.title;
                                 document.getElementById('modalBookAuthor').value = ds.author;
+                                document.getElementById('modalBookIsbn').value = ds.isbn;
 
                                 // Read description from hidden div (safer for quotes/newlines)
                                 const descEl = document.getElementById(`desc-${ds.id}`);

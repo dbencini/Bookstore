@@ -15,6 +15,10 @@ const Book = sequelize.define('Book', {
         type: DataTypes.STRING,
         allowNull: false
     },
+    isbn: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     description: {
         type: DataTypes.STRING(4000)
     },

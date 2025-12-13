@@ -57,6 +57,15 @@ async function fetchGoogleBooks(query = 'subject:fiction') {
             if (!info.title || !info.authors || !info.description) continue;
             if (!info.imageLinks || (!info.imageLinks.thumbnail && !info.imageLinks.smallThumbnail)) continue;
 
+            // Extract ISBN (prefer ISBN-13)
+            let isbn = null;
+            if (info.industryIdentifiers) {
+                const isbn13 = info.industryIdentifiers.find(id => id.type === 'ISBN_13');
+                const isbn10 = info.industryIdentifiers.find(id => id.type === 'ISBN_10');
+                if (isbn13) isbn = isbn13.identifier;
+                else if (isbn10) isbn = isbn10.identifier;
+            }
+
             const bookData = {
                 title: info.title,
                 author: info.authors ? info.authors.join(', ') : 'Unknown',
@@ -64,6 +73,7 @@ async function fetchGoogleBooks(query = 'subject:fiction') {
                 price: 19.99,
                 imageUrl: info.imageLinks.thumbnail || info.imageLinks.smallThumbnail,
                 category: 'General',
+                isbn: isbn,
                 JobId: job.id
             };
 
@@ -135,7 +145,9 @@ async function fixBookData() {
                     { description: null },
                     { description: '' },
                     { description: 'No description available.' },
-                    { imageUrl: { [Op.like]: '%placehold.co%' } }
+                    { imageUrl: { [Op.like]: '%placehold.co%' } },
+                    { isbn: null },
+                    { isbn: '' }
                 ]
             }
         });
@@ -178,8 +190,22 @@ async function fixBookData() {
 
                     // Fix Image
                     if (book.imageUrl.includes('placehold.co') && info.imageLinks && (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail)) {
-                        book.imageUrl = info.imageLinks.thumbnail || info.imageLinks.smallThumbnail;
                         updated = true;
+                    }
+
+                    // Fix ISBN
+                    if (!book.isbn) {
+                        if (info.industryIdentifiers) {
+                            const isbn13 = info.industryIdentifiers.find(id => id.type === 'ISBN_13');
+                            const isbn10 = info.industryIdentifiers.find(id => id.type === 'ISBN_10');
+                            if (isbn13) {
+                                book.isbn = isbn13.identifier;
+                                updated = true;
+                            } else if (isbn10) {
+                                book.isbn = isbn10.identifier;
+                                updated = true;
+                            }
+                        }
                     }
 
                     if (updated) {

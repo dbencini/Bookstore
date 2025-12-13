@@ -115,7 +115,7 @@ router.post('/users/:id/update', async (req, res) => {
 // Book Management
 router.get('/books', async (req, res) => {
     try {
-        const { page = 1, title, author, category, startDate, endDate } = req.query;
+        const { page = 1, title, author, category, isbn, startDate, endDate } = req.query;
         const limit = 12;
         const offset = (page - 1) * limit;
         const { Op } = require('sequelize');
@@ -125,7 +125,9 @@ router.get('/books', async (req, res) => {
         const include = [];
 
         if (title) where.title = { [Op.like]: `%${title}%` };
+        if (title) where.title = { [Op.like]: `%${title}%` };
         if (author) where.author = { [Op.like]: `%${author}%` };
+        if (isbn) where.isbn = { [Op.like]: `%${isbn}%` };
 
         // Date Range Search
         if (startDate || endDate) {
@@ -165,7 +167,7 @@ router.get('/books', async (req, res) => {
             page: 'books',
             currentPage: parseInt(page),
             totalPages,
-            filters: { title, author, category, startDate, endDate }
+            filters: { title, author, category, isbn, startDate, endDate }
         });
     } catch (err) {
         console.error(err);
@@ -215,13 +217,14 @@ router.post('/books/:id/update', async (req, res) => {
     try {
         const book = await Book.findByPk(req.params.id);
         if (book) {
-            const { categoryId, price, imageUrl, stock, description, isVisible } = req.body;
+            const { categoryId, price, imageUrl, stock, description, isVisible, isbn } = req.body;
             console.log('[DEBUG] Update Body:', req.body);
             console.log('[DEBUG] Received Description:', description);
 
             if (categoryId) book.categoryId = categoryId;
             if (price) book.price = parseFloat(price);
             if (imageUrl) book.imageUrl = imageUrl;
+            if (isbn) book.isbn = isbn;
 
             if (stock !== undefined && stock !== '') {
                 const stockVal = parseInt(stock, 10);
