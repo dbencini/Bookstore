@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote } = require('../models');
+const { User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem } = require('../models');
 // ...
 
 // Book Management
@@ -16,6 +16,94 @@ const bcrypt = require('bcrypt');
 
 // Apply Auth Middleware Globally to this Router
 router.use(requireAdmin);
+
+// Apply Auth Middleware Globally to this Router
+router.use(requireAdmin);
+
+// GET /workshop - View all workshop tasks (Placed top to avoid conflicts)
+router.get('/workshop', async (req, res) => {
+    try {
+        const { Op } = require('sequelize');
+        const { search, page = 1, showIncomplete, orderId } = req.query;
+        const limit = 12;
+        const offset = (page - 1) * limit;
+
+        const whereClause = {};
+        // const includeBookWhere = {}; // This is no longer needed with the new search logic
+
+        // Filter: Show Incomplete (Default to true if undefined, false only if explicitly 'false')
+        // User Requirement: "set by default each time the page is visited"
+        const isIncompleteFilter = showIncomplete !== 'false';
+
+        if (isIncompleteFilter) {
+            // Explicitly include false OR null to be safe across SQL dialects
+            whereClause[Op.or] = [
+                { threeKnife: { [Op.is]: null } },
+                { threeKnife: false },
+                { dispatch: { [Op.is]: null } },
+                { dispatch: false }
+            ];
+        }
+
+        if (orderId) {
+            whereClause['$OrderItem.Order.id$'] = { [Op.like]: `%${orderId}%` };
+        }
+
+        if (search) {
+            // Advanced Search: Match Book Title/ISBN OR Order ID
+            // We use top-level where with included columns
+            whereClause[Op.and] = [
+                {
+                    [Op.or]: [
+                        { '$OrderItem.Book.title$': { [Op.like]: `%${search}%` } },
+                        { '$OrderItem.Book.isbn$': { [Op.like]: `%${search}%` } },
+                        { '$OrderItem.Order.id$': { [Op.like]: `%${search}%` } }
+                    ]
+                }
+            ];
+        }
+
+        const { count, rows } = await Workshop.findAndCountAll({
+            where: whereClause,
+            distinct: true,
+            limit,
+            offset,
+            subQuery: false, // Required for association filtering
+            order: [['createdAt', 'ASC']], // User Req: Order Date ASC
+            include: [
+                {
+                    model: OrderItem,
+                    required: true,
+                    include: [
+                        { model: Book },
+                        { model: Order }
+                    ]
+                }
+            ]
+        });
+
+        const viewData = {
+            title: 'Workshop Tasks',
+            workshops: rows,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(count / limit),
+            totalItems: count,
+            searchQuery: search || '',
+            orderIdQuery: orderId || '',
+            showIncomplete: isIncompleteFilter,
+            user: req.user
+        };
+
+        if (req.query.ajax) {
+            return res.render('admin/partials/workshop-grid', { ...viewData, layout: false });
+        }
+
+        res.render('admin/workshop', viewData);
+    } catch (err) {
+        console.error('Error fetching workshop tasks:', err);
+        res.status(500).render('error', { message: 'Error loading workshop tasks', error: err });
+    }
+});
 
 // Dashboard
 router.get('/', async (req, res) => {
@@ -317,16 +405,25 @@ router.post('/jobs/:id/stop', async (req, res) => {
     }
 });
 
-// Footer Settings Management
+// Combined Settings Management
 router.get('/settings', async (req, res) => {
     try {
-        let settings = await FooterSetting.findOne();
-        if (!settings) {
-            settings = await FooterSetting.create({});
-        }
-        res.render('admin/social_settings', {
+        const { SiteConfig, FooterSetting } = require('../models');
+
+        // Load App Config
+        let settings = await SiteConfig.findOne();
+        if (!settings) settings = await SiteConfig.create({ appName: 'My Bookstore', theme: 'light' });
+
+        // Load Footer Settings
+        let footer = await FooterSetting.findOne();
+        if (!footer) footer = await FooterSetting.create({});
+
+        res.render('admin/settings', {
             page: 'settings',
-            settings
+            settings,
+            footer,
+            success: req.query.success,
+            error: req.query.error
         });
     } catch (err) {
         console.error(err);
@@ -336,27 +433,37 @@ router.get('/settings', async (req, res) => {
 
 router.post('/settings', async (req, res) => {
     try {
-        let settings = await FooterSetting.findOne();
-        if (!settings) {
-            settings = await FooterSetting.create({});
-        }
+        const { SiteConfig, FooterSetting } = require('../models');
+        const { appName, logoUrl, themeColor, facebookUrl, twitterUrl, instagramUrl, linkedinUrl, youtubeUrl } = req.body;
 
-        const { facebookUrl, twitterUrl, instagramUrl, linkedinUrl, youtubeUrl } = req.body;
+        // Update SiteConfig
+        let settings = await SiteConfig.findOne();
+        if (!settings) settings = await SiteConfig.create({});
 
-        settings.facebookUrl = facebookUrl;
-        settings.twitterUrl = twitterUrl;
-        settings.instagramUrl = instagramUrl;
-        settings.linkedinUrl = linkedinUrl;
-        settings.youtubeUrl = youtubeUrl;
-
+        settings.appName = appName;
+        settings.logoUrl = logoUrl;
+        settings.themeColor = themeColor; // Ensure model has this too if used
         await settings.save();
+
+        // Update FooterSetting
+        let footer = await FooterSetting.findOne();
+        if (!footer) footer = await FooterSetting.create({});
+
+        footer.facebookUrl = facebookUrl;
+        footer.twitterUrl = twitterUrl;
+        footer.instagramUrl = instagramUrl;
+        footer.linkedinUrl = linkedinUrl;
+        footer.youtubeUrl = youtubeUrl;
+        await footer.save();
 
         res.redirect('/admin/settings?success=true');
     } catch (err) {
         console.error(err);
-        res.redirect('/admin/settings?error=UpdateFailed');
+        res.redirect('/admin/settings?error=' + encodeURIComponent(err.message));
     }
 });
+
+
 
 // Order Management (CRM)
 router.get('/orders', async (req, res) => {
@@ -435,22 +542,66 @@ router.get('/orders/:id/details', async (req, res) => {
 // [NEW] Workshop Update
 router.post('/workshop/update', async (req, res) => {
     try {
-        const { Workshop } = require('../models'); // Ensure Workshop is imported here
+        const { Workshop, OrderItem, Order } = require('../models'); // Ensure Workshop is imported here
         const { workshopId, field, value } = req.body; // field: 'threeKnife' or 'dispatch'
 
         const workshop = await Workshop.findByPk(workshopId);
         if (!workshop) return res.status(404).json({ success: false, error: 'Workshop record not found' });
 
-        if (field === 'threeKnife') {
-            workshop.threeKnife = value;
-            workshop.threeKnifeDate = value ? new Date() : null;
-        } else if (field === 'dispatch') {
-            workshop.dispatch = value;
-            workshop.dispatchDate = value ? new Date() : null;
+        if (field === 'threeKnife') workshop.threeKnife = value;
+        if (field === 'dispatch') workshop.dispatch = value;
+
+        // Update timestamps
+        if (value) {
+            if (field === 'threeKnife') workshop.threeKnifeDate = new Date();
+            if (field === 'dispatch') workshop.dispatchDate = new Date();
+        } else {
+            if (field === 'threeKnife') workshop.threeKnifeDate = null;
+            if (field === 'dispatch') workshop.dispatchDate = null;
         }
 
         await workshop.save();
-        res.json({ success: true, workshop });
+
+        let orderCompleted = false;
+        let completedOrderId = null;
+
+        // check if parent order is fully complete
+        const fullWorkshop = await Workshop.findByPk(workshopId, {
+            include: [{
+                model: OrderItem,
+                include: [Order]
+            }]
+        });
+
+        if (fullWorkshop && fullWorkshop.OrderItem && fullWorkshop.OrderItem.Order) {
+            const orderId = fullWorkshop.OrderItem.Order.id;
+
+            // Get all items for this order
+            const orderItems = await OrderItem.findAll({
+                where: { OrderId: orderId },
+                include: [Workshop]
+            });
+
+            // Check if ALL items have BOTH 3-knife and dispatch checked
+            const allComplete = orderItems.every(item => {
+                const ws = item.Workshop;
+                return ws && ws.threeKnife === true && ws.dispatch === true;
+            });
+
+            if (allComplete) {
+                // Determine status - if currently 'Pending' or 'Processing', move to 'Shipped'
+                const order = fullWorkshop.OrderItem.Order;
+                if (order.status !== 'Shipped' && order.status !== 'Cancelled') {
+                    order.status = 'Shipped';
+                    await order.save();
+                    orderCompleted = true;
+                    completedOrderId = orderId;
+                    console.log(`Order ${orderId} auto-marked as Shipped.`);
+                }
+            }
+        }
+
+        res.json({ success: true, workshop, orderCompleted, completedOrderId });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, error: err.message });

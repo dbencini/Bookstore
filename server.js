@@ -121,6 +121,27 @@ app.use(async (req, res, next) => {
             config = await SiteConfig.create({ appName: 'My Bookstore', theme: 'light' });
         }
         res.locals.siteConfig = config;
+        res.locals.appName = config.appName || 'My Bookstore';
+        // Ensure logoUrl references /images/ if it's just a filename
+        let logo = config.logoUrl || '/images/logo_v2.svg';
+        if (logo && !logo.startsWith('/images/') && !logo.startsWith('http')) {
+            logo = '/images/' + logo;
+        }
+        res.locals.appLogo = logo;
+
+        const themeColor = config.themeColor || '#0d6efd';
+        res.locals.themeColor = themeColor;
+
+        // Compute RGB for Bootstrap variables (cleaner than doing it in EJS)
+        try {
+            const hex = themeColor.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            res.locals.themeColorRgb = `${r}, ${g}, ${b}`;
+        } catch (e) {
+            res.locals.themeColorRgb = '13, 110, 253';
+        }
 
         // Fetch Categories for Global Menu
         const categories = await Category.findAll({ order: [['name', 'ASC']] });
@@ -128,6 +149,8 @@ app.use(async (req, res, next) => {
     } catch (err) {
         console.error('Error loading site config:', err);
         res.locals.siteConfig = { appName: 'Fallback POD' };
+        res.locals.appName = 'My Bookstore';
+        res.locals.appLogo = '/images/logo_v2.svg';
     }
     next();
 });
@@ -168,6 +191,10 @@ const indexRoutes = require('./routes/index');
 const cartRoutes = require('./routes/cart');
 
 app.use('/auth', authRoutes);
+app.get('/theme.css', (req, res) => {
+    res.set('Content-Type', 'text/css');
+    res.render('theme-css', { layout: false });
+});
 app.use('/', indexRoutes);
 app.use('/cart', cartRoutes);
 app.use('/admin', adminRoutes);

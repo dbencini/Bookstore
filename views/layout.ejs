@@ -37,14 +37,16 @@
             /* Firefox */
         }
     </style>
+    <link rel="stylesheet" href="/theme.css">
+</head>
 </head>
 
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 text-center">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <img src="/images/logo_v2.svg" alt="My Bookstore" height="40" class="d-inline-block align-middle me-2">
-                My Bookstore
+                <img src="<%= appLogo %>" alt="<%= appName %>" height="40" class="d-inline-block align-middle me-2">
+                <%= appName %>
             </a>
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav ms-auto align-items-center">

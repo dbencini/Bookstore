@@ -16,6 +16,10 @@ const SiteConfig = sequelize.define('SiteConfig', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    themeColor: {
+        type: DataTypes.STRING,
+        defaultValue: '#0d6efd'
+    },
     theme: {
         type: DataTypes.STRING,
         defaultValue: 'light'

@@ -1,0 +1,294 @@
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Workshop Tasks</h2>
+        <div class="mb-3 text-secondary">
+            Total Tasks: <strong>
+                <%= totalItems %>
+            </strong> (Page <%= currentPage %>)
+        </div>
+    </div>
+
+    <!-- Advanced Search Card (Style Reference: capture_form1.md) -->
+    <div class="card mb-3 admin-panel-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Search & Filter</span>
+        </div>
+        <div class="card-body">
+            <form action="/admin/workshop" method="GET" id="searchForm" class="row g-3 align-items-center">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" name="search" id="searchInput"
+                            placeholder="Book Title or ISBN..." value="<%= searchQuery %>">
+                        <span class="input-group-text d-none text-muted" id="searchStatus"
+                            style="min-width: 80px;">Waiting...</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+                        <input type="text" class="form-control" name="orderId" id="orderIdInput"
+                            placeholder="Order ID..." value="<%= orderIdQuery %>">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check form-switch pt-2">
+                        <input class="form-check-input" type="checkbox" id="showIncomplete" name="showIncomplete"
+                            value="true" <%=showIncomplete ? 'checked' : '' %>>
+                        <label class="form-check-label" for="showIncomplete">Pending Only</label>
+                    </div>
+                </div>
+                <!-- Submit button removed for live search -->
+            </form>
+        </div>
+    </div>
+
+    <!-- Data Grid Container -->
+    <div id="gridContainer" class="table-responsive admin-panel-dark p-2 rounded">
+        <%- include('partials/workshop-grid') %>
+    </div>
+</div>
+
+<style>
+    /* Admin Grid Styles from capture_form1.md */
+
+
+    [data-theme="dark"] .admin-panel-dark {
+        background-color: #343a40 !important;
+        color: #f8f9fa !important;
+        border-color: #454d55 !important;
+    }
+
+    [data-theme="dark"] .admin-panel-dark .card-header {
+        background-color: #343a40;
+        border-bottom-color: #454d55;
+    }
+
+    [data-theme="dark"] .admin-panel-dark .card-body {
+        background-color: #454d55;
+        color: #e0e0e0;
+    }
+
+    [data-theme="dark"] .table {
+        color: #f8f9fa;
+        border-color: #565e64;
+    }
+
+    [data-theme="dark"] .table-light th {
+        background-color: #343a40;
+        color: #f8f9fa;
+        border-color: #565e64;
+    }
+
+    [data-theme="dark"] .form-control {
+        background-color: #454d55;
+        border-color: #565e64;
+        color: #e0e0e0;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const gridContainer = document.getElementById('gridContainer');
+        const searchInput = document.getElementById('searchInput');
+        const orderIdInput = document.getElementById('orderIdInput');
+        const searchForm = document.getElementById('searchForm');
+        const searchStatus = document.getElementById('searchStatus');
+        const showIncompleteToggle = document.getElementById('showIncomplete');
+
+        let searchTimeout;
+
+        // Function to Reload Grid via AJAX
+        async function reloadGrid(page = 1) {
+            const search = searchInput.value;
+            const orderId = orderIdInput.value;
+            const showIncomplete = showIncompleteToggle.checked;
+
+            // Visual Feedback
+            searchStatus.classList.remove('d-none');
+            searchStatus.textContent = 'Loading...';
+            gridContainer.style.opacity = '0.5';
+
+            try {
+                const url = `/admin/workshop?ajax=true&search=${encodeURIComponent(search)}&orderId=${encodeURIComponent(orderId)}&showIncomplete=${showIncomplete}&page=${page}`;
+                const res = await fetch(url);
+                const html = await res.text();
+
+                gridContainer.innerHTML = html;
+                gridContainer.style.opacity = '1';
+                searchStatus.classList.add('d-none');
+
+                // Re-attach listeners to new content
+                attachToggleListeners();
+                attachPaginationListeners();
+            } catch (err) {
+                console.error('Grid load error:', err);
+                searchStatus.textContent = 'Error';
+            }
+        }
+
+        // Generic Input Listener for debounce logic
+        function attachInputListener(inputEl) {
+            if (inputEl) {
+                if (inputEl.value) {
+                    const val = inputEl.value;
+                    inputEl.focus();
+                    inputEl.value = '';
+                    inputEl.value = val;
+                }
+
+                inputEl.addEventListener('input', function () {
+                    clearTimeout(searchTimeout);
+                    searchStatus.classList.remove('d-none');
+                    searchStatus.textContent = 'Waiting...';
+
+                    searchTimeout = setTimeout(() => {
+                        reloadGrid(1);
+                    }, 2000);
+                });
+            }
+        }
+
+        attachInputListener(searchInput);
+        attachInputListener(orderIdInput);
+
+        // Toggle "Pending Only" Listener
+        if (showIncompleteToggle) {
+            showIncompleteToggle.addEventListener('change', function () {
+                reloadGrid(1);
+            });
+        }
+
+        // Pagination Listeners
+        function attachPaginationListeners() {
+            document.querySelectorAll('.ajax-link').forEach(link => {
+                // Remove old listeners by cloning or just relying on fresh DOM from AJAX
+                // Since this is called on reload, fresh DOM is guaranteed. 
+                // For initial load, standard listener.
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const page = this.dataset.page;
+                    reloadGrid(page);
+                });
+            });
+        }
+
+        // Checkbox Toggle Listeners (Row logic)
+        function attachToggleListeners() {
+            document.querySelectorAll('.ws-toggle').forEach(chk => {
+                chk.addEventListener('change', async function () {
+                    const workshopId = this.dataset.id;
+                    const field = this.dataset.field;
+                    const value = this.checked;
+                    const dateEl = document.getElementById(`date-${field}-${workshopId}`);
+                    const row = document.getElementById(`row-${workshopId}`);
+
+                    try {
+                        const res = await fetch('/admin/workshop/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ workshopId, field, value })
+                        });
+                        const data = await res.json();
+
+                        if (data.success) {
+                            // Show Completion Badge if entire order is done
+                            if (data.orderCompleted) {
+                                showCompletionBadge(data.completedOrderId);
+                            }
+
+                            // User Request: If filtered and we tick a box, clear filter to show all rows
+                            if (value && searchInput.value.trim() !== '') {
+                                searchInput.value = '';
+                                reloadGrid(1);
+                                return;
+                            }
+
+                            // Update date display
+                            dateEl.textContent = value ? new Date().toLocaleDateString() : '-';
+
+                            // Check for Row Removal Logic (if Pending Only is ON)
+                            if (showIncompleteToggle && showIncompleteToggle.checked) {
+                                // Find sibling checkbox
+                                const otherField = field === 'threeKnife' ? 'dispatch' : 'threeKnife';
+                                const otherChk = row.querySelector(`.ws-toggle[data-field="${otherField}"]`);
+
+                                // If BOTH are now checked (complete), remove row
+                                if (value && otherChk && otherChk.checked) {
+                                    row.classList.add('table-success');
+
+                                    // Animate and Remove
+                                    setTimeout(() => {
+                                        row.style.transition = 'all 0.5s ease';
+                                        row.style.opacity = '0';
+                                        row.style.transform = 'translateX(20px)';
+
+                                        setTimeout(() => {
+                                            if (row.parentNode) {
+                                                row.remove();
+                                            }
+                                        }, 500);
+                                    }, 300);
+                                }
+                            }
+                        } else {
+                            throw new Error(data.error);
+                        }
+                    } catch (err) {
+                        alert('Error updating status: ' + err.message);
+                        this.checked = !this.checked; // Revert
+                    }
+                });
+            });
+        }
+
+        function showCompletionBadge(orderId) {
+            // Create Badge Element
+            const badge = document.createElement('div');
+            const shortId = orderId ? orderId.split('-')[0].toUpperCase() : '???';
+            badge.className = 'floating-badge';
+            badge.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i> Order ${shortId} has been completed`;
+            document.body.appendChild(badge);
+
+            // Animate In (handled by CSS keyframes usually, or JS transition)
+            // We'll use JS for simple enter/exit
+            requestAnimationFrame(() => {
+                badge.style.bottom = '50px'; // Move up
+                badge.style.opacity = '1';
+            });
+
+            // Remove after 3s
+            setTimeout(() => {
+                badge.style.opacity = '0';
+                badge.style.bottom = '20px'; // Move down
+                setTimeout(() => badge.remove(), 500);
+            }, 3500);
+        }
+
+        // Initial Attach
+        attachToggleListeners();
+        attachPaginationListeners();
+    });
+</script>
+
+<style>
+    .floating-badge {
+        position: fixed;
+        bottom: -100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #198754;
+        /* Success Green */
+        color: white;
+        padding: 15px 30px;
+        border-radius: 50px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        font-weight: bold;
+        z-index: 9999;
+        opacity: 0;
+        transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex;
+        align-items: center;
+        font-size: 1.1rem;
+    }
+</style>

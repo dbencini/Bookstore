@@ -1,0 +1,75 @@
+<table class="table table-hover align-middle mb-0">
+    <thead class="table-light">
+        <tr>
+            <th>Order Date</th>
+            <th>Order ID</th>
+            <th>Book Details</th>
+            <th class="text-center">3-Knife Trim</th>
+            <th class="text-center">Dispatch</th>
+        </tr>
+    </thead>
+    <tbody>
+        <% if (workshops.length===0) { %>
+            <tr>
+                <td colspan="5" class="text-center py-4">No workshop tasks found.</td>
+            </tr>
+            <% } else { %>
+                <% workshops.forEach(ws=> { %>
+                    <tr class="<%= ws.threeKnife && ws.dispatch ? 'table-success' : '' %>" id="row-<%= ws.id %>">
+                        <td>
+                            <%= new Date(ws.createdAt).toLocaleDateString() %>
+                        </td>
+                        <td><code><%= ws.OrderItem && ws.OrderItem.Order ? ws.OrderItem.Order.id.split('-')[0].toUpperCase() : 'N/A' %></code>
+                        </td>
+                        <td>
+                            <strong>
+                                <%= ws.bookTitle %>
+                            </strong><br>
+                            <small class="text-muted">ISBN: <%= ws.isbn %></small>
+                        </td>
+                        <td class="text-center">
+                            <div class="form-check d-inline-block">
+                                <input type="checkbox" class="form-check-input ws-toggle" data-id="<%= ws.id %>"
+                                    data-field="threeKnife" <%=ws.threeKnife ? 'checked' : '' %>>
+                            </div>
+                            <div class="small text-muted" id="date-threeKnife-<%= ws.id %>">
+                                <%= ws.threeKnifeDate ? new Date(ws.threeKnifeDate).toLocaleDateString() : '-' %>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <div class="form-check d-inline-block">
+                                <input type="checkbox" class="form-check-input ws-toggle" data-id="<%= ws.id %>"
+                                    data-field="dispatch" <%=ws.dispatch ? 'checked' : '' %>>
+                            </div>
+                            <div class="small text-muted" id="date-dispatch-<%= ws.id %>">
+                                <%= ws.dispatchDate ? new Date(ws.dispatchDate).toLocaleDateString() : '-' %>
+                            </div>
+                        </td>
+                    </tr>
+                    <% }) %>
+                        <% } %>
+    </tbody>
+</table>
+
+<!-- Pagination (AJAX Aware) -->
+<% if (totalPages> 1) { %>
+    <div class="admin-panel-dark p-2 rounded mt-3">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                    <a class="page-link ajax-link" href="#" data-page="<%= currentPage - 1 %>">Previous</a>
+                </li>
+                <% for(let i=1; i <=totalPages; i++) { %>
+                    <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                        <a class="page-link ajax-link" href="#" data-page="<%= i %>">
+                            <%= i %>
+                        </a>
+                    </li>
+                    <% } %>
+                        <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                            <a class="page-link ajax-link" href="#" data-page="<%= currentPage + 1 %>">Next</a>
+                        </li>
+            </ul>
+        </nav>
+    </div>
+    <% } %>
