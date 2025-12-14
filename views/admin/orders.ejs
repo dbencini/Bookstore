@@ -1,0 +1,479 @@
+<div class="container mt-4">
+    <h2>Order Management (CRM)</h2>
+
+    <div class="mb-3 text-secondary">
+        Total Orders: <strong>
+            <%= totalOrders %>
+        </strong>
+        <span class="ms-3 badge bg-warning text-dark">
+            <%= pendingCount %> Pending Payment
+        </span>
+        <span class="ms-2 badge bg-info text-dark">
+            <%= unfulfilledCount %> To Ship
+        </span>
+    </div>
+
+    <!-- Filter Panel -->
+    <div class="card mb-3 admin-panel-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Filters</span>
+            <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse"
+                data-bs-target="#searchPanel">
+                <i class="bi bi-funnel"></i> Toggle
+            </button>
+        </div>
+        <div class="collapse show" id="searchPanel">
+            <div class="card-body">
+                <form action="/admin/orders" method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Payment Status</label>
+                        <select name="status" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="completed" <%=filters.status==='completed' ? 'selected' : '' %>>Completed
+                            </option>
+                            <option value="pending" <%=filters.status==='pending' ? 'selected' : '' %>>Pending</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Fulfillment</label>
+                        <select name="fulfillment" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="unfulfilled" <%=filters.fulfillment==='unfulfilled' ? 'selected' : '' %>
+                                >Unfulfilled</option>
+                            <option value="shipped" <%=filters.fulfillment==='shipped' ? 'selected' : '' %>>Shipped
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-12 text-end">
+                        <a href="/admin/orders" class="btn btn-sm btn-secondary me-2">Clear</a>
+                        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Grid -->
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Total</th>
+                <th>Payment</th>
+                <th class="text-center">Shipped?</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% orders.forEach(order=> { %>
+                <tr id="tr-<%= order.id %>">
+                    <td>
+                        <%= new Date(order.createdAt).toLocaleDateString() %>
+                    </td>
+                    <td><code><%= order.id.split('-')[0].toUpperCase() %></code></td>
+                    <td>
+                        <%= order.User ? order.User.name : 'Unknown' %><br>
+                            <small class="text-muted">
+                                <%= order.User ? order.User.email : '' %>
+                            </small>
+                    </td>
+                    <td>R<%= parseFloat(order.total).toFixed(2) %>
+                    </td>
+                    <td>
+                        <span class="badge bg-<%= order.status === 'completed' ? 'success' : 'secondary' %>">
+                            <%= order.status %>
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <div class="form-check d-inline-block">
+                            <input class="form-check-input fulfillment-toggle" type="checkbox" data-id="<%= order.id %>"
+                                <%=order.fulfillmentStatus==='shipped' ? 'checked' : '' %>>
+                        </div>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary view-crm-btn" data-id="<%= order.id %>">
+                            <i class="bi bi-person-lines-fill"></i> CRM
+                        </button>
+                    </td>
+                </tr>
+                <% }) %>
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <% if (totalPages> 1) { %>
+        <div class="admin-panel-dark p-2 rounded mt-3">
+            <nav>
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage - 1 %>">Previous</a>
+                    </li>
+                    <% for(let i=1; i <=totalPages; i++) { %>
+                        <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %>">
+                                <%= i %>
+                            </a>
+                        </li>
+                        <% } %>
+                            <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                                <a class="page-link" href="?page=<%= currentPage + 1 %>">Next</a>
+                            </li>
+                </ul>
+            </nav>
+        </div>
+        <% } %>
+</div>
+
+<!-- CRM Modal -->
+<div class="modal fade" id="crmModal" tabindex="-1">
+    <div class="modal-dialog modal-lg" style="max-width: 900px;">
+        <!-- Widened by roughly 100px from standard lg (800px) -->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Order CRM</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Details Column -->
+                    <div class="col-md-5 border-end">
+                        <h6>Order Details</h6>
+                        <div id="modalOrderDetails" class="mb-3">Loading...</div>
+
+                        <h6 class="mt-3">Workshop Tasks</h6>
+                        <div id="modalWorkshop" class="border rounded p-1 bg-light">
+                            <!-- Workshop items injected here -->
+                        </div>
+                    </div>
+                    <!-- Notes Column -->
+                    <div class="col-md-7">
+                        <form id="addNoteForm" class="mb-3">
+                            <input type="hidden" id="modalOrderId" name="orderId">
+                            <div class="mb-2">
+                                <textarea class="form-control" name="content" rows="2" placeholder="Add a note..."
+                                    required></textarea>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="emailCustomer"
+                                        name="emailCustomer">
+                                    <label class="form-check-label" for="emailCustomer">Email Customer</label>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm">Add Note</button>
+                            </div>
+                        </form>
+
+                        <h6>Customer Interaction / Notes</h6>
+                        <div id="modalNotesList" class="border rounded p-2 mb-3 bg-light"
+                            style="height: 300px; overflow-y: auto;">
+                            <!-- Notes injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Fix for Dark Mode text in White Modals */
+    [data-theme="dark"] #crmModal .modal-content {
+        background-color: #343a40;
+        /* Dark background for modal */
+        color: #f8f9fa;
+        /* Light text */
+    }
+
+    [data-theme="dark"] #crmModal .form-control {
+        background-color: #454d55;
+        border-color: #565e64;
+        color: #f8f9fa;
+    }
+
+    [data-theme="dark"] #crmModal .btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
+
+    /* Workshop Table Dark Mode Fixes */
+    [data-theme="dark"] #modalWorkshop {
+        background-color: #454d55 !important;
+        /* Dark background instead of bg-light */
+        border-color: #565e64 !important;
+    }
+
+    [data-theme="dark"] #modalWorkshop .table {
+        color: #f8f9fa;
+        border-color: #565e64;
+    }
+
+    [data-theme="dark"] #modalWorkshop .table-light th {
+        background-color: #343a40;
+        color: #f8f9fa;
+        border-color: #565e64;
+    }
+
+    [data-theme="dark"] #modalWorkshop .table-bordered td,
+    [data-theme="dark"] #modalWorkshop .table-bordered th {
+        border-color: #565e64;
+    }
+
+    /* Note list dark mode fix */
+    [data-theme="dark"] #modalNotesList {
+        background-color: #454d55 !important;
+        border-color: #565e64 !important;
+    }
+
+    [data-theme="dark"] #modalNotesList .card {
+        background-color: #343a40;
+        color: #f8f9fa !important;
+        /* Override inline black style */
+    }
+
+    [data-theme="dark"] #addNoteForm .form-control {
+        background-color: #454d55;
+        color: #fff;
+        border-color: #6c757d;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 1. Fulfillment Toggles
+        document.querySelectorAll('.fulfillment-toggle').forEach(chk => {
+            chk.addEventListener('change', async function () {
+                const orderId = this.dataset.id;
+                const newStatus = this.checked ? 'shipped' : 'unfulfilled';
+
+                try {
+                    const res = await fetch(`/admin/orders/${orderId}/status`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fulfillmentStatus: newStatus })
+                    });
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.error);
+                    // Success feedback (optional, visual flash)
+                } catch (err) {
+                    alert('Error updating status: ' + err.message);
+                    this.checked = !this.checked; // Revert
+                }
+            });
+        });
+
+        // 2. CRM Modal - Initialize ONLY if Bootstrap is available
+        if (typeof bootstrap !== 'undefined') {
+            const crmModalEl = document.getElementById('crmModal');
+            if (crmModalEl) {
+                const crmModal = new bootstrap.Modal(crmModalEl);
+
+                document.querySelectorAll('.view-crm-btn').forEach(btn => {
+                    btn.addEventListener('click', async function () {
+                        const orderId = this.dataset.id;
+                        document.getElementById('modalOrderId').value = orderId;
+                        document.getElementById('modalOrderDetails').innerHTML = '<div class="spinner-border text-primary"></div>';
+                        document.getElementById('modalNotesList').innerHTML = '';
+
+                        crmModal.show();
+
+                        try {
+                            const res = await fetch(`/admin/orders/${orderId}/details`);
+                            if (!res.ok) throw new Error('Failed to fetch details');
+                            const order = await res.json();
+
+                            // Render Details
+                            document.getElementById('modalOrderDetails').innerHTML = `
+                                <p><strong>ID:</strong> ${order.id}</p>
+                                <p><strong>Total:</strong> R${parseFloat(order.total).toFixed(2)}</p>
+                                <p><strong>Status:</strong> ${order.status}</p>
+                                <p><strong>Customer:</strong><br>${order.User ? order.User.name : 'Unknown'}<br>${order.User ? order.User.email : ''}</p>
+                                <div class="alert alert-info py-1"><small>Payment Status: <strong>${order.status.toUpperCase()}</strong></small></div>
+                            `;
+
+                            // [NEW] Render Workshop Table
+                            const workshopContainer = document.getElementById('modalWorkshop');
+                            if (workshopContainer) {
+                                if (order.OrderItems && order.OrderItems.length > 0) {
+                                    // [NEW] Workshop Container with Filter and Scrollbar
+                                    let workshopHtml = `
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <input type="text" id="workshopFilter" class="form-control form-control-sm me-2" placeholder="Filter by Title or ISBN...">
+                                            <small id="filterStatus" class="text-muted d-none">Filtering...</small>
+                                        </div>
+                                        <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                                            <table class="table table-sm table-bordered mb-0" style="font-size: 0.85rem;">
+                                                <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                                                    <tr><th>Book</th><th class="text-center">3-Knife</th><th class="text-center">Dispatch</th></tr>
+                                                </thead>
+                                                <tbody>
+                                    `;
+
+                                    order.OrderItems.forEach(item => {
+                                        const ws = item.Workshop;
+                                        if (ws) {
+                                            workshopHtml += `
+                                                <tr class="ws-row">
+                                                    <td>
+                                                        <strong>${ws.bookTitle || item.Book.title}</strong><br>
+                                                        <span class="text-muted">ISBN: ${ws.isbn}</span>
+                                                    </td>
+                                                    <td class="text-center align-middle">
+                                                        <input type="checkbox" class="form-check-input ws-toggle" 
+                                                            data-id="${ws.id}" data-field="threeKnife" 
+                                                            ${ws.threeKnife ? 'checked' : ''}>
+                                                        <br><small class="text-muted" id="date-threeKnife-${ws.id}">${ws.threeKnifeDate ? new Date(ws.threeKnifeDate).toLocaleDateString() : '-'}</small>
+                                                    </td>
+                                                    <td class="text-center align-middle">
+                                                        <input type="checkbox" class="form-check-input ws-toggle" 
+                                                            data-id="${ws.id}" data-field="dispatch" 
+                                                            ${ws.dispatch ? 'checked' : ''}>
+                                                        <br><small class="text-muted" id="date-dispatch-${ws.id}">${ws.dispatchDate ? new Date(ws.dispatchDate).toLocaleDateString() : '-'}</small>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        } else {
+                                            workshopHtml += `<tr><td colspan="3" class="text-muted">No workshop data (Legacy Order)</td></tr>`;
+                                        }
+                                    });
+                                    workshopHtml += '</tbody></table></div></div>'; // Close scrollable div
+
+                                    workshopContainer.innerHTML = workshopHtml;
+
+                                    // Filter Logic
+                                    let filterTimeout;
+                                    const statusEl = document.getElementById('filterStatus');
+                                    // Use 'input' event to catch typing, pasting, cutting, etc.
+                                    document.getElementById('workshopFilter').addEventListener('input', function (e) {
+                                        clearTimeout(filterTimeout);
+                                        const term = e.target.value.toLowerCase();
+
+                                        // Show "Waiting..."
+                                        statusEl.classList.remove('d-none');
+                                        statusEl.textContent = 'Waiting...';
+
+                                        filterTimeout = setTimeout(() => {
+                                            let count = 0;
+                                            document.querySelectorAll('.ws-row').forEach(row => {
+                                                const text = row.innerText.toLowerCase();
+                                                const match = text.includes(term);
+                                                row.style.display = match ? '' : 'none';
+                                                if (match) count++;
+                                            });
+                                            statusEl.textContent = count + ' found';
+                                            setTimeout(() => statusEl.classList.add('d-none'), 2000);
+                                        }, 2000);
+                                    });
+
+                                    // Attach Listeners to new toggles
+                                    document.querySelectorAll('.ws-toggle').forEach(chk => {
+                                        chk.addEventListener('change', async function () {
+                                            const workshopId = this.dataset.id;
+                                            const field = this.dataset.field;
+                                            const value = this.checked;
+                                            const dateEl = document.getElementById(`date-${field}-${workshopId}`);
+
+                                            try {
+                                                const res = await fetch('/admin/workshop/update', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ workshopId, field, value })
+                                                });
+                                                const data = await res.json();
+                                                if (data.success) {
+                                                    const newDate = data.workshop[field + 'Date'];
+                                                    dateEl.textContent = newDate ? new Date(newDate).toLocaleDateString() : '-';
+                                                } else {
+                                                    alert('Error: ' + data.error);
+                                                    this.checked = !this.checked;
+                                                }
+                                            } catch (err) {
+                                                console.error(err);
+                                                alert('Network error');
+                                                this.checked = !this.checked;
+                                            }
+                                        });
+                                    });
+
+                                } else {
+                                    workshopContainer.innerHTML = '<p class="text-muted small">No items loaded.</p>';
+                                }
+                            }
+                            if (order.OrderNotes && order.OrderNotes.length > 0) {
+                                order.OrderNotes.forEach(note => renderNote(note));
+                            } else {
+                                document.getElementById('modalNotesList').innerHTML = '<p class="text-muted text-center mt-4">No notes yet.</p>';
+                            }
+                        } catch (err) {
+                            document.getElementById('modalOrderDetails').innerHTML = `<div class="text-danger">${err.message}</div>`;
+                        }
+                    });
+                });
+            }
+        } else {
+            console.error('Bootstrap 5 not loaded yet!');
+        }
+
+        // 3. Add Note
+        const noteForm = document.getElementById('addNoteForm');
+        if (noteForm) {
+            noteForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const orderId = document.getElementById('modalOrderId').value;
+                const form = this;
+                // Manual extraction to avoid issues
+                const content = form.querySelector('[name="content"]').value;
+                const emailCustomer = form.querySelector('[name="emailCustomer"]').checked;
+
+                if (!content) return;
+
+                try {
+                    const res = await fetch(`/admin/orders/${orderId}/note`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content, emailCustomer })
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        // Remove "No notes" message if exists
+                        if (document.getElementById('modalNotesList').querySelector('.text-center')) {
+                            document.getElementById('modalNotesList').innerHTML = '';
+                        }
+                        renderNote(data.note, true); // Prepend
+                        form.reset();
+                    } else {
+                        alert('Error adding note: ' + data.error);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error adding note: ' + err.message);
+                }
+            });
+        }
+
+        function renderNote(note, prepend = false) {
+            const html = `
+                <div class="card mb-2 border-0 shadow-sm">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="fw-bold">${note.User ? note.User.name : 'System'}</small>
+                            <small class="text-muted">${new Date(note.createdAt).toLocaleString()}</small>
+                        </div>
+                        <p class="mb-1 small">${note.content}</p>
+                        ${note.isCustomerVisible ? '<div class="badge bg-success float-end" style="font-size: 0.6em">Emailed</div>' : ''}
+                    </div>
+                </div>
+            `;
+            // Check if dark mode is active to style the note card differently if needed
+            // For now, let's keep simple bootstrap card which is white. 
+            // In dark mode modal, this white card needs black text.
+            const container = document.getElementById('modalNotesList');
+            if (prepend) {
+                container.insertAdjacentHTML('afterbegin', html);
+            } else {
+                container.insertAdjacentHTML('beforeend', html);
+            }
+        }
+    });
+</script>

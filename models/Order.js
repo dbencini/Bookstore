@@ -14,6 +14,10 @@ const Order = sequelize.define('Order', {
     status: {
         type: DataTypes.STRING,
         defaultValue: 'pending' // pending, completed
+    },
+    fulfillmentStatus: {
+        type: DataTypes.STRING, // 'unfulfilled', 'shipped'
+        defaultValue: 'unfulfilled'
     }
 });
 

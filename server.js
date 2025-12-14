@@ -136,6 +136,17 @@ app.use(async (req, res, next) => {
 app.use(async (req, res, next) => {
     res.locals.user = req.user;
     res.locals.title = res.locals.siteConfig ? res.locals.siteConfig.appName : 'Bookstore';
+    res.locals.cartCount = 0; // Default
+
+    if (req.user) {
+        try {
+            const { CartItem } = require('./models');
+            const count = await CartItem.sum('quantity', { where: { UserId: req.user.id } });
+            res.locals.cartCount = count || 0;
+        } catch (err) {
+            console.error('Error fetching cart count:', err);
+        }
+    }
 
     try {
         let footerSettings = await FooterSetting.findOne();

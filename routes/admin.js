@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, UserType, Book, Category, Job, FooterSetting } = require('../models');
+const { User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote } = require('../models');
 // ...
 
 // Book Management
@@ -355,6 +355,151 @@ router.post('/settings', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.redirect('/admin/settings?error=UpdateFailed');
+    }
+});
+
+// Order Management (CRM)
+router.get('/orders', async (req, res) => {
+    try {
+        const { page = 1, status, fulfillment } = req.query;
+        const limit = 12;
+        const offset = (page - 1) * limit;
+        const { Op } = require('sequelize');
+
+        const where = {};
+        if (status) where.status = status;
+        if (fulfillment) where.fulfillmentStatus = fulfillment;
+
+        const { count, rows } = await Order.findAndCountAll({
+            where,
+            include: [
+                { model: User, attributes: ['name', 'email'] }
+            ],
+            limit,
+            offset,
+            order: [['createdAt', 'DESC']]
+        });
+
+        // Calculate stats for top counters
+        const pendingCount = await Order.count({ where: { status: 'pending' } });
+        const unfulfilledCount = await Order.count({ where: { fulfillmentStatus: 'unfulfilled', status: 'completed' } });
+
+        const totalPages = Math.ceil(count / limit);
+
+        res.render('admin/orders', {
+            orders: rows,
+            totalOrders: count,
+            pendingCount,
+            unfulfilledCount,
+            page: 'orders',
+            currentPage: parseInt(page),
+            totalPages,
+            filters: { status, fulfillment }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+});
+
+router.get('/orders/:id/details', async (req, res) => {
+    try {
+        const { OrderItem, Workshop, Book } = require('../models');
+        const order = await Order.findByPk(req.params.id, {
+            include: [
+                { model: User, attributes: ['name', 'email'] },
+                {
+                    model: OrderNote,
+                    include: [{ model: User, attributes: ['name'] }],
+                    order: [['createdAt', 'DESC']]
+                },
+                {
+                    model: OrderItem,
+                    include: [
+                        { model: Book, attributes: ['title', 'isbn'] },
+                        { model: Workshop } // Include Workshop details
+                    ]
+                }
+            ]
+        });
+
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+
+        res.json(order);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server Error' });
+    }
+});
+
+// [NEW] Workshop Update
+router.post('/workshop/update', async (req, res) => {
+    try {
+        const { Workshop } = require('../models'); // Ensure Workshop is imported here
+        const { workshopId, field, value } = req.body; // field: 'threeKnife' or 'dispatch'
+
+        const workshop = await Workshop.findByPk(workshopId);
+        if (!workshop) return res.status(404).json({ success: false, error: 'Workshop record not found' });
+
+        if (field === 'threeKnife') {
+            workshop.threeKnife = value;
+            workshop.threeKnifeDate = value ? new Date() : null;
+        } else if (field === 'dispatch') {
+            workshop.dispatch = value;
+            workshop.dispatchDate = value ? new Date() : null;
+        }
+
+        await workshop.save();
+        res.json({ success: true, workshop });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/orders/:id/status', async (req, res) => {
+    try {
+        const { fulfillmentStatus } = req.body;
+        const order = await Order.findByPk(req.params.id);
+
+        if (order) {
+            order.fulfillmentStatus = fulfillmentStatus;
+            await order.save();
+            return res.json({ success: true, fulfillmentStatus: order.fulfillmentStatus });
+        }
+        res.status(404).json({ success: false, error: 'Order not found' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/orders/:id/note', async (req, res) => {
+    try {
+        const { content, emailCustomer } = req.body;
+        if (!content) return res.status(400).json({ error: 'Content required' });
+
+        const note = await OrderNote.create({
+            OrderId: req.params.id,
+            UserId: req.user.id, // Admin User
+            content,
+            isCustomerVisible: !!emailCustomer
+        });
+
+        if (emailCustomer) {
+            console.log(`[CRM-EMAIL-STUB] Sending email to Customer of Order ${req.params.id}: "${content}"`);
+            // In future: await emailService.send(...)
+        }
+
+        // Return note with author name for UI injection
+        const noteWithAuthor = await OrderNote.findByPk(note.id, {
+            include: [{ model: User, attributes: ['name'] }]
+        });
+
+        res.json({ success: true, note: noteWithAuthor });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

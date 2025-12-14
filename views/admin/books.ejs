@@ -107,7 +107,7 @@
                         <%= book.isbn || '-' %>
                     </td>
                     <td>
-                        $<%= book.price ? book.price.toFixed(2) : '0.00' %>
+                        R<%= book.price ? book.price.toFixed(2) : '0.00' %>
                     </td>
                     <td>
                         <%= book.Category ? book.Category.name : 'Uncategorized' %>
@@ -245,7 +245,7 @@
                                                     </select>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
-                                                    <label class="form-label fw-bold">Price ($)</label>
+                                                    <label class="form-label fw-bold">Price (R)</label>
                                                     <input type="number" name="price" id="modalBookPrice"
                                                         class="form-control" step="0.01" min="0">
                                                 </div>
