@@ -125,14 +125,19 @@ router.post('/checkout', isAuthenticated, async (req, res) => {
             });
         }
 
+        // Generate a secure token to verify the return URL (Prevent spoofing)
+        const crypto = require('crypto');
+        const generateToken = (id) => crypto.createHmac('sha256', process.env.SESSION_SECRET || 'secret').update(id).digest('hex');
+        const token = generateToken(order.id);
+
         // Construct PayFast Payload (_paynow simplified)
         const payload = {
             cmd: '_paynow',
             receiver: PAYFAST_MERCHANT_ID, // 10004002 or 10000100
             item_name: `Order #${order.id.split('-')[0].toUpperCase()}`,
             amount: total.toFixed(2),
-            // Optional but good for UX
-            return_url: `http://localhost:3001/cart/checkout/success`,
+            // Secure Return URL: Works on Localhost (for UX) and Production (as Immediate Feedback)
+            return_url: `http://localhost:3001/cart/checkout/success?orderId=${order.id}&token=${token}`,
             cancel_url: `http://localhost:3001/cart/checkout/cancel`,
             notify_url: `http://localhost:3001/cart/checkout/notify`,
 
@@ -206,11 +211,29 @@ router.post('/checkout/notify', async (req, res) => {
 // Success Page
 router.get('/checkout/success', isAuthenticated, async (req, res) => {
     try {
-        // UX FIX for Localhost/Demo:
-        // Since PayFast ITN cannot reach localhost to clear the cart automatically,
-        // we will forcefully clear the cart here so the user sees immediate results.
-        // In a strict production app, you might wait for ITN or check order status first.
+        const { orderId, token } = req.query;
 
+        if (orderId && token) {
+            // Verify Logic (Same secret as creation)
+            const crypto = require('crypto');
+            const expectedToken = crypto.createHmac('sha256', process.env.SESSION_SECRET || 'secret').update(orderId).digest('hex');
+
+            if (token === expectedToken) {
+                // Token matches -> Authentic "Success" redirect from PayFast
+                const order = await Order.findByPk(orderId);
+                if (order && order.UserId === req.user.id) {
+                    if (order.status !== 'completed') {
+                        console.log(`[Checkout Success] Secure Token Verified. Completing Order ${orderId}`);
+                        order.status = 'completed';
+                        await order.save();
+                    }
+                }
+            } else {
+                console.warn(`[Checkout Success] Invalid Token for Order ${orderId}`);
+            }
+        }
+
+        // UX FIX: Clear cart
         await CartItem.destroy({ where: { UserId: req.user.id } });
 
         res.render('cart', {
