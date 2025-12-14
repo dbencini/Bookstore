@@ -19,3 +19,9 @@
                         .navbar-light .navbar-nav .nav-link.active {
                         color: <%= themeColor %>;
                             }
+
+                            /* Force links in cards and brand to use text color */
+                            .card-title a, .navbar-brand {
+                            color: inherit !important;
+                            text-decoration: none;
+                            }

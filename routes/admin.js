@@ -434,7 +434,7 @@ router.get('/settings', async (req, res) => {
 router.post('/settings', async (req, res) => {
     try {
         const { SiteConfig, FooterSetting } = require('../models');
-        const { appName, logoUrl, themeColor, facebookUrl, twitterUrl, instagramUrl, linkedinUrl, youtubeUrl } = req.body;
+        const { appName, logoUrl, facebookUrl, twitterUrl, instagramUrl, linkedinUrl, youtubeUrl } = req.body;
 
         // Update SiteConfig
         let settings = await SiteConfig.findOne();
@@ -442,7 +442,6 @@ router.post('/settings', async (req, res) => {
 
         settings.appName = appName;
         settings.logoUrl = logoUrl;
-        settings.themeColor = themeColor; // Ensure model has this too if used
         await settings.save();
 
         // Update FooterSetting
