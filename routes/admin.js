@@ -588,10 +588,10 @@ router.post('/workshop/update', async (req, res) => {
             });
 
             if (allComplete) {
-                // Determine status - if currently 'Pending' or 'Processing', move to 'Shipped'
+                // Determine status - if currently 'Pending' or 'Processing', mark as Shipped in fulfillment
                 const order = fullWorkshop.OrderItem.Order;
-                if (order.status !== 'Shipped' && order.status !== 'Cancelled') {
-                    order.status = 'Shipped';
+                if (order.fulfillmentStatus !== 'shipped') {
+                    order.fulfillmentStatus = 'shipped';
                     await order.save();
                     orderCompleted = true;
                     completedOrderId = orderId;
