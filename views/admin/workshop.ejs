@@ -464,8 +464,15 @@
                         if (contentType && contentType.indexOf("application/json") !== -1) {
                             const data = await res.json();
                             if (data.success) {
-                                alert('File sent to hotfolder!');
-                                reloadGrid(currentPage);
+                                // Success Feedback
+                                this.innerHTML = '<span class="badge bg-success">Downloaded</span>';
+                                this.disabled = true;
+
+                                showToast(`File sent to hotfolder!`, 'success');
+
+                                // Reload grid to update Links
+                                setTimeout(() => reloadGrid(currentPage), 1000);
+
                             } else {
                                 alert('Error: ' + data.error);
                                 this.innerHTML = originalText;
@@ -521,11 +528,25 @@
             });
         }
 
-        // Hook into reloadGrid to re-attach
-        // We override the original reloadGrid to add this call, or modify it.
-        // Looking at line 122/123 in original file, I should probably just replace the entire reloadGrid function OR inject it there.
-        // It's cleaner to just update the reloadGrid definition if I can access it, but I only have chunks here.
-        // The reloadGrid function calls attachToggleListeners and attachPaginationListeners. I should add attachFileListeners there too.
+        function showToast(message, type = 'success') {
+            const badge = document.createElement('div');
+            badge.className = 'floating-badge';
+            if (type === 'error') badge.style.backgroundColor = '#dc3545';
+
+            badge.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-circle-fill'} me-2"></i> ${message}`;
+            document.body.appendChild(badge);
+
+            requestAnimationFrame(() => {
+                badge.style.transform = 'translate(-50%, -50%) scale(1)';
+                badge.style.opacity = '1';
+            });
+
+            setTimeout(() => {
+                badge.style.opacity = '0';
+                badge.style.transform = 'translate(-50%, -50%) scale(0.8)';
+                setTimeout(() => badge.remove(), 500);
+            }, 3000);
+        }
 
     });
 </script>
@@ -533,21 +554,21 @@
 <style>
     .floating-badge {
         position: fixed;
-        bottom: -100px;
+        top: 50%;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translate(-50%, -50%) scale(0.8);
         background-color: #198754;
         /* Success Green */
         color: white;
-        padding: 15px 30px;
-        border-radius: 50px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        padding: 20px 40px;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
         font-weight: bold;
         z-index: 9999;
         opacity: 0;
-        transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         display: flex;
         align-items: center;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
     }
 </style>
