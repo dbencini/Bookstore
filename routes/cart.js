@@ -245,7 +245,12 @@ router.get('/checkout/success', isAuthenticated, async (req, res) => {
                         console.log(`[Checkout Success] Secure Token Verified. Completing Order ${orderId}`);
                         order.status = 'completed';
                         await order.save();
+
+                        // Clear User's Cart immediately for UX (double-check in case ITN delayed)
+                        await CartItem.destroy({ where: { UserId: req.user.id } });
                     }
+                    // Explicitly reset cart count for the view, as middleware ran before this
+                    res.locals.cartCount = 0;
                 }
             } else {
                 console.warn(`[Checkout Success] Invalid Token for Order ${orderId}`);
