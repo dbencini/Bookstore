@@ -26,7 +26,7 @@
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <label for="orderIdInput" class="form-label small text-muted">Filter by Order ID</label>
+                    <label for="orderIdInput" class="form-label small text-muted">Filter by OrderNo</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
                         <input type="text" class="form-control" name="orderId" id="orderIdInput"
@@ -359,7 +359,7 @@
                     <div class="col-md-6">
                         <h6>Order Info</h6>
                         <table class="table table-sm table-borderless">
-                            <tr><td><strong>CP ID:</strong></td><td>${order.cpOrderId}</td></tr>
+                            <tr><td><strong>OrderNo:</strong></td><td>${order.cpOrderId}</td></tr>
                             <tr><td><strong>Date:</strong></td><td>${new Date(order.orderDate).toLocaleString()}</td></tr>
                             <tr><td><strong>Status:</strong></td><td><span class="badge bg-secondary">${order.status}</span></td></tr>
                             <tr><td><strong>Reference:</strong></td><td>${order.clientReference || '-'}</td></tr>
