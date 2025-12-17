@@ -26,6 +26,34 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    addressStreet: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    addressTown: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    addressCity: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    addressProvince: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    addressZip: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    addressCountry: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    emailVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
     userTypeId: {
         type: DataTypes.UUID,
         allowNull: true // Should be false eventually, but true for flexibility during migration/seeding if needed

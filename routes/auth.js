@@ -30,10 +30,13 @@ router.get('/register', (req, res) => {
 
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, confirmPassword } = req.body;
         // Basic validation
-        if (!name || !email || !password) {
+        if (!name || !email || !password || !confirmPassword) {
             return res.render('register', { error: 'All fields are required' });
+        }
+        if (password !== confirmPassword) {
+            return res.render('register', { error: 'Passwords do not match' });
         }
 
         const existingUser = await User.findOne({ where: { email } });

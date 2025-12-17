@@ -10,51 +10,120 @@
             <p>Your cart is empty.</p>
             <a href="/books" class="btn btn-primary">Continue Shopping</a>
             <% } else if (cartItems.length> 0) { %>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Book</th>
-                            <th>Price</th>
-                            <th>Quantity</th>
-                            <th>Subtotal</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% cartItems.forEach(item=> { %>
-                            <tr>
-                                <td>
-                                    <%= item.Book.title %>
-                                </td>
-                                <td>R<%= item.Book.price %>
-                                </td>
-                                <td>
-                                    <%= item.quantity %>
-                                </td>
-                                <td>R<%= (item.quantity * item.Book.price).toFixed(2) %>
-                                </td>
-                                <td>
-                                    <form action="/cart/remove" method="POST">
-                                        <input type="hidden" name="itemId" value="<%= item.id %>">
-                                        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            <% }) %>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="3" class="text-end"><strong>Total:</strong></td>
-                            <td><strong>R<%= total.toFixed(2) %></strong></td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
+                <div class="row">
+                    <!-- Left Column: Cart Items -->
+                    <div class="col-md-8">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Book</th>
+                                    <th>Price</th>
+                                    <th>Quantity</th>
+                                    <th>Subtotal</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% cartItems.forEach(item=> { %>
+                                    <tr>
+                                        <td>
+                                            <%= item.Book.title %>
+                                        </td>
+                                        <td>R<%= item.Book.price %>
+                                        </td>
+                                        <td>
+                                            <%= item.quantity %>
+                                        </td>
+                                        <td>R<%= (item.quantity * item.Book.price).toFixed(2) %>
+                                        </td>
+                                        <td>
+                                            <form action="/cart/remove" method="POST">
+                                                <input type="hidden" name="itemId" value="<%= item.id %>">
+                                                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <% }) %>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                    <td><strong>R<%= total.toFixed(2) %></strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
 
-                <div class="d-flex justify-content-between">
-                    <a href="/books" class="btn btn-secondary">Continue Shopping</a>
-                    <form action="/cart/checkout" method="POST">
-                        <button type="submit" class="btn btn-success">Checkout</button>
-                    </form>
+                        <div class="mt-3">
+                            <a href="/books" class="btn btn-secondary">Continue Shopping</a>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Delivery Address & Checkout -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                Checkout Details
+                            </div>
+                            <div class="card-body">
+                                <form action="/cart/checkout" method="POST">
+                                    <h5 class="card-title mb-3">Delivery Address</h5>
+
+                                    <div class="mb-3">
+                                        <label for="addressStreet" class="form-label">Flat / Street</label>
+                                        <input type="text" name="addressStreet" class="form-control"
+                                            value="<%= user.addressStreet || '' %>" required
+                                            placeholder="123 Main St, Flat 4">
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressTown" class="form-label">Town</label>
+                                            <input type="text" name="addressTown" class="form-control"
+                                                value="<%= user.addressTown || '' %>" required placeholder="Town">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressCity" class="form-label">City</label>
+                                            <input type="text" name="addressCity" class="form-control"
+                                                value="<%= user.addressCity || '' %>" required placeholder="City">
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressProvince" class="form-label">Province</label>
+                                            <input type="text" name="addressProvince" class="form-control"
+                                                value="<%= user.addressProvince || '' %>" required
+                                                placeholder="Province">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressZip" class="form-label">Postcode</label>
+                                            <input type="text" name="addressZip" class="form-control"
+                                                value="<%= user.addressZip || '' %>" required placeholder="1234">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="addressCountry" class="form-label">Country</label>
+                                        <select name="addressCountry" class="form-select" required>
+                                            <option value="">Select Country...</option>
+                                            <% if (locals.countries) { %>
+                                                <% countries.forEach(country=> { %>
+                                                    <option value="<%= country %>" <%=user.addressCountry===country
+                                                        ? 'selected' : '' %>><%= country %>
+                                                    </option>
+                                                    <% }) %>
+                                                        <% } %>
+                                        </select>
+                                    </div>
+
+                                    <div class="d-grid gap-2 mt-4">
+                                        <button type="submit" class="btn btn-success btn-lg">Proceed to
+                                            Checkout</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <% } %>

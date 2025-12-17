@@ -56,4 +56,44 @@ router.get('/books/:id', async (req, res) => {
     }
 });
 
+// Profile Routes
+const { ensureAuthenticated } = require('../middleware/auth');
+const { User } = require('../models');
+const countries = require('../config/countries');
+
+router.get('/profile', ensureAuthenticated, (req, res) => {
+    res.render('profile', { user: req.user, countries });
+});
+
+router.post('/profile', ensureAuthenticated, async (req, res) => {
+    try {
+        const { name, email, addressStreet, addressTown, addressCity, addressProvince, addressZip, addressCountry } = req.body;
+        const user = await User.findByPk(req.user.id);
+
+        if (email !== user.email) {
+            const existing = await User.findOne({ where: { email } });
+            if (existing) {
+                return res.render('profile', { user, countries, error: 'Email already currently in use by another account.' });
+            }
+            user.email = email;
+            user.emailVerified = false;
+        }
+
+        user.name = name;
+        user.addressStreet = addressStreet;
+        user.addressTown = addressTown;
+        user.addressCity = addressCity;
+        user.addressProvince = addressProvince;
+        user.addressZip = addressZip;
+        user.addressCountry = addressCountry;
+
+        await user.save();
+
+        res.render('profile', { user, countries, success: 'Profile updated successfully.' });
+    } catch (err) {
+        console.error(err);
+        res.render('profile', { user: req.user, countries, error: 'Failed to update profile.' });
+    }
+});
+
 module.exports = router;

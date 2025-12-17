@@ -10,6 +10,8 @@ function isAuthenticated(req, res, next) {
     res.redirect('/auth/login');
 }
 
+const countries = require('../config/countries');
+
 // router.use(isAuthenticated); // Removed global application
 
 router.get('/', isAuthenticated, async (req, res) => {
@@ -25,7 +27,7 @@ router.get('/', isAuthenticated, async (req, res) => {
         });
 
         const message = req.query.message;
-        res.render('cart', { cartItems, total, message });
+        res.render('cart', { cartItems, total, message, countries });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
@@ -73,6 +75,23 @@ const { generateSignature, PAYFAST_MERCHANT_ID, PAYFAST_MERCHANT_KEY, PAYFAST_UR
 // Checkout - Redirect to PayFast
 router.post('/checkout', isAuthenticated, async (req, res) => {
     try {
+        // [NEW] Update Delivery Address from Cart
+        const { addressStreet, addressTown, addressCity, addressProvince, addressZip, addressCountry } = req.body;
+
+        let addressChanged = false;
+        const user = await User.findByPk(req.user.id);
+
+        if (addressStreet && addressStreet !== user.addressStreet) { user.addressStreet = addressStreet; addressChanged = true; }
+        if (addressTown && addressTown !== user.addressTown) { user.addressTown = addressTown; addressChanged = true; }
+        if (addressCity && addressCity !== user.addressCity) { user.addressCity = addressCity; addressChanged = true; }
+        if (addressProvince && addressProvince !== user.addressProvince) { user.addressProvince = addressProvince; addressChanged = true; }
+        if (addressZip && addressZip !== user.addressZip) { user.addressZip = addressZip; addressChanged = true; }
+        if (addressCountry && addressCountry !== user.addressCountry) { user.addressCountry = addressCountry; addressChanged = true; }
+
+        if (addressChanged) {
+            await user.save();
+        }
+
         const cartItems = await CartItem.findAll({ where: { UserId: req.user.id }, include: [Book] });
         if (cartItems.length === 0) return res.redirect('/cart');
 

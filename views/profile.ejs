@@ -1,0 +1,96 @@
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">My Profile</div>
+            <div class="card-body">
+                <% if (locals.success) { %>
+                    <div class="alert alert-success">
+                        <%= success %>
+                    </div>
+                    <% } %>
+                        <% if (locals.error) { %>
+                            <div class="alert alert-danger">
+                                <%= error %>
+                            </div>
+                            <% } %>
+
+                                <form action="/profile" method="POST">
+                                    <div class="mb-3">
+                                        <label for="name" class="form-label">Full Name</label>
+                                        <input type="text" name="name" class="form-control" value="<%= user.name %>"
+                                            required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email Address</label>
+                                        <div class="input-group">
+                                            <input type="email" name="email" class="form-control"
+                                                value="<%= user.email %>" required>
+                                            <span
+                                                class="input-group-text <%= user.emailVerified ? 'bg-success text-white' : 'bg-warning' %>">
+                                                <% if (user.emailVerified) { %>
+                                                    <i class="bi bi-check-circle-fill me-1"></i> Verified
+                                                    <% } else { %>
+                                                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Unverified
+                                                        <% } %>
+                                            </span>
+                                        </div>
+                                        <div class="form-text">Changing your email will reset your verification status.
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3">
+                                            <label for="addressStreet" class="form-label">Flat / Street</label>
+                                            <input type="text" name="addressStreet" class="form-control"
+                                                value="<%= user.addressStreet || '' %>"
+                                                placeholder="123 Main St, Flat 4">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressTown" class="form-label">Town</label>
+                                            <input type="text" name="addressTown" class="form-control"
+                                                value="<%= user.addressTown || '' %>" placeholder="Town">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressCity" class="form-label">City</label>
+                                            <input type="text" name="addressCity" class="form-control"
+                                                value="<%= user.addressCity || '' %>" placeholder="City">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressProvince" class="form-label">Province / State</label>
+                                            <input type="text" name="addressProvince" class="form-control"
+                                                value="<%= user.addressProvince || '' %>"
+                                                placeholder="Province / State">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="addressZip" class="form-label">Postcode</label>
+                                            <input type="text" name="addressZip" class="form-control"
+                                                value="<%= user.addressZip || '' %>" placeholder="1234">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-12 mb-3">
+                                            <label for="addressCountry" class="form-label">Country</label>
+                                            <select name="addressCountry" class="form-select">
+                                                <option value="">Select Country...</option>
+                                                <% if (locals.countries) { %>
+                                                    <% countries.forEach(country=> { %>
+                                                        <option value="<%= country %>" <%=user.addressCountry===country
+                                                            ? 'selected' : '' %>><%= country %>
+                                                        </option>
+                                                        <% }) %>
+                                                            <% } %>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                                </form>
+            </div>
+        </div>
+    </div>
+</div>
