@@ -1,7 +1,7 @@
 <div class="row mb-4">
     <div class="col-md-6 offset-md-3">
         <form action="/books" method="GET" class="d-flex">
-            <input class="form-control me-2" type="search" placeholder="Search by title or author" name="search"
+            <input class="form-control me-2" type="search" placeholder="Search by title, author, or ISBN" name="search"
                 value="<%= locals.search || '' %>">
             <button class="btn btn-outline-success" type="submit">Search</button>
         </form>

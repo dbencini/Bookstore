@@ -14,7 +14,8 @@ router.get('/books', async (req, res) => {
     if (search) {
         whereClause[Op.or] = [
             { title: { [Op.like]: `%${search}%` } },
-            { author: { [Op.like]: `%${search}%` } }
+            { author: { [Op.like]: `%${search}%` } },
+            { isbn: { [Op.like]: `%${search}%` } }
         ];
     }
     if (category) {
