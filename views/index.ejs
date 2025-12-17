@@ -33,6 +33,10 @@
                             </p>
                             <div class="mt-auto">
                                 <span class="fs-5 fw-bold">R<%= book.price %></span>
+                                <% if (book.isbn) { %>
+                                    <p class="card-text text-muted small mb-0">ISBN: <%= book.isbn %>
+                                    </p>
+                                    <% } %>
                             </div>
                         </div>
                     </div>
