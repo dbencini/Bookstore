@@ -7,6 +7,8 @@ const Workshop = sequelize.define('Workshop', {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true
     },
+    // Foreign Keys are added automatically via associations, but we can be explicit if needed.
+    // We will rely on associations for orderSourceId, OrderItemId, cpOrderItemId
     orderDate: {
         type: DataTypes.DATE,
         allowNull: false,

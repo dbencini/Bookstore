@@ -11,6 +11,14 @@ const OrderNote = require('./OrderNote');
 const FooterSetting = require('./FooterSetting');
 const OrderItem = require('./OrderItem');
 const Workshop = require('./Workshop');
+const OrderSource = require('./OrderSource');
+
+// CloudPrinter Models
+const CpOrder = require('./CpOrder');
+const CpOrderItem = require('./CpOrderItem');
+const CpAddress = require('./CpAddress');
+const CpFile = require('./CpFile');
+const CpSignal = require('./CpSignal');
 
 // Associations
 UserType.hasMany(User, { foreignKey: 'userTypeId' });
@@ -44,8 +52,37 @@ Book.hasMany(OrderItem);
 OrderItem.belongsTo(Book);
 
 // Workshop (Manufacturing tracking per item)
+// Workshop can belong to either a local OrderItem or a CloudPrinter OrderItem
+// We'll use orderSourceId to distinguish
+Workshop.belongsTo(OrderSource, { foreignKey: 'orderSourceId' });
+OrderSource.hasMany(Workshop, { foreignKey: 'orderSourceId' });
+
+Workshop.belongsTo(OrderItem); // Regular website orders
 OrderItem.hasOne(Workshop);
-Workshop.belongsTo(OrderItem);
+
+Workshop.belongsTo(CpOrderItem); // CloudPrinter orders
+CpOrderItem.hasOne(Workshop);
+
+// CloudPrinter Associations
+
+// CloudPrinter Associations
+CpOrder.hasMany(CpOrderItem);
+CpOrderItem.belongsTo(CpOrder);
+
+CpOrder.hasMany(CpAddress);
+CpAddress.belongsTo(CpOrder);
+
+CpOrder.hasMany(CpFile); // For order level files like shipping labels
+CpFile.belongsTo(CpOrder);
+
+CpOrderItem.hasMany(CpFile); // For item level files like cover/book
+CpFile.belongsTo(CpOrderItem);
+
+CpOrder.hasMany(CpSignal);
+CpSignal.belongsTo(CpOrder);
+
+CpOrderItem.hasMany(CpSignal);
+CpSignal.belongsTo(CpOrderItem);
 
 module.exports = {
     sequelize,
@@ -60,5 +97,11 @@ module.exports = {
     FooterSetting,
     OrderNote,
     OrderItem,
-    Workshop
+    Workshop,
+    OrderSource,
+    CpOrder,
+    CpOrderItem,
+    CpAddress,
+    CpFile,
+    CpSignal
 };

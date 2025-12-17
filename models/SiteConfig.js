@@ -23,6 +23,14 @@ const SiteConfig = sequelize.define('SiteConfig', {
     theme: {
         type: DataTypes.STRING,
         defaultValue: 'light'
+    },
+    sandboxPayfast: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
+    sandboxCloudPrint: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
     }
 });
 

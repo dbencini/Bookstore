@@ -1,9 +1,11 @@
 <table class="table table-hover align-middle mb-0">
     <thead class="table-light">
         <tr>
-            <th>Order Date</th>
-            <th>Order ID</th>
+            <th>Date</th>
+            <th>Source</th>
+            <th>Order No</th>
             <th>Book Details</th>
+            <th>Files / Actions</th>
             <th class="text-center">3-Knife Trim</th>
             <th class="text-center">Dispatch</th>
         </tr>
@@ -11,21 +13,73 @@
     <tbody>
         <% if (workshops.length===0) { %>
             <tr>
-                <td colspan="5" class="text-center py-4">No workshop tasks found.</td>
+                <td colspan="7" class="text-center py-4">No workshop tasks found.</td>
             </tr>
             <% } else { %>
-                <% workshops.forEach(ws=> { %>
+                <% workshops.forEach(ws=> {
+                    const isCp = ws.OrderSource && ws.OrderSource.name === 'Cloud Print';
+                    const orderId = isCp && ws.CpOrderItem && ws.CpOrderItem.CpOrder ?
+                    ws.CpOrderItem.CpOrder.cpOrderId :
+                    (ws.OrderItem && ws.OrderItem.Order ? ws.OrderItem.Order.id.split('-')[0].toUpperCase() : 'N/A');
+
+                    const files = isCp && ws.CpOrderItem ? ws.CpOrderItem.CpFiles : [];
+                    %>
                     <tr class="<%= ws.threeKnife && ws.dispatch ? 'table-success' : '' %>" id="row-<%= ws.id %>">
                         <td>
                             <%= new Date(ws.createdAt).toLocaleDateString() %>
                         </td>
-                        <td><code><%= ws.OrderItem && ws.OrderItem.Order ? ws.OrderItem.Order.id.split('-')[0].toUpperCase() : 'N/A' %></code>
+                        <td>
+                            <% if(isCp) { %>
+                                <span class="badge bg-info text-dark">Cloud Print</span>
+                                <% } else { %>
+                                    <span class="badge bg-secondary">Website</span>
+                                    <% } %>
                         </td>
+                        <td><code><%= orderId %></code></td>
                         <td>
                             <strong>
                                 <%= ws.bookTitle %>
                             </strong><br>
                             <small class="text-muted">ISBN: <%= ws.isbn %></small>
+                        </td>
+                        <td>
+                            <% if(isCp && files && files.length> 0) { %>
+                                <% files.forEach(file=> { %>
+                                    <div class="mb-1">
+                                        <small>
+                                            <%= file.type %>:
+                                        </small>
+                                        <% if(file.localPath) { %>
+                                            <span class="badge bg-success">Downloaded</span>
+                                            <button class="btn btn-sm btn-link text-danger p-0 ms-1 delete-file-btn"
+                                                data-id="<%= file.id %>">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            <a href="/hotfolder/<%= file.type %>_<%= file.id %>.pdf" target="_blank"
+                                                class="btn btn-sm btn-link p-0 ms-1 text-decoration-none">View</a>
+                                            <% } else { %>
+                                                <button
+                                                    class="btn btn-sm btn-outline-primary py-0 px-1 download-file-btn"
+                                                    data-id="<%= file.id %>">
+                                                    <i class="bi bi-download"></i> Hotfolder
+                                                </button>
+                                                <% } %>
+                                    </div>
+                                    <% }) %>
+                                        <% } else if (isCp) { %>
+                                            <span class="text-muted small">No Files</span>
+                                            <% } else { %>
+                                                <span class="text-muted small">-</span>
+                                                <% } %>
+                                                    <% if(isCp) { %>
+                                                        <div class="mt-1">
+                                                            <button
+                                                                class="btn btn-sm btn-outline-info py-0 px-1 view-cp-details"
+                                                                data-id="<%= ws.CpOrderItem && ws.CpOrderItem.CpOrder ? ws.CpOrderItem.CpOrder.id : '' %>">
+                                                                <i class="bi bi-info-circle"></i> Details
+                                                            </button>
+                                                        </div>
+                                                        <% } %>
                         </td>
                         <td class="text-center">
                             <div class="form-check d-inline-block">

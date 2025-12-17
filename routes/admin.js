@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem } = require('../models');
+const { User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem, OrderSource, CpOrderItem, CpOrder, CpFile, CpAddress } = require('../models');
 // ...
 
 // Book Management
@@ -63,6 +63,12 @@ router.get('/workshop', async (req, res) => {
             ];
         }
 
+        const { source } = req.query;
+        let sourceWhere = {};
+        if (source && source !== 'All') {
+            sourceWhere = { name: source };
+        }
+
         const { count, rows } = await Workshop.findAndCountAll({
             where: whereClause,
             distinct: true,
@@ -71,12 +77,21 @@ router.get('/workshop', async (req, res) => {
             subQuery: false, // Required for association filtering
             order: [['createdAt', 'ASC']], // User Req: Order Date ASC
             include: [
+                { model: OrderSource, where: sourceWhere },
                 {
                     model: OrderItem,
-                    required: true,
+                    required: false, // Make this optional so we can see CloudPrint items too
                     include: [
                         { model: Book },
                         { model: Order }
+                    ]
+                },
+                {
+                    model: CpOrderItem,
+                    required: false,
+                    include: [
+                        { model: CpOrder },
+                        { model: CpFile } // To get the files
                     ]
                 }
             ]
@@ -91,6 +106,7 @@ router.get('/workshop', async (req, res) => {
             searchQuery: search || '',
             orderIdQuery: orderId || '',
             showIncomplete: isIncompleteFilter,
+            sourceFilter: source || 'All',
             user: req.user
         };
 
@@ -434,7 +450,7 @@ router.get('/settings', async (req, res) => {
 router.post('/settings', async (req, res) => {
     try {
         const { SiteConfig, FooterSetting } = require('../models');
-        const { appName, logoUrl, facebookUrl, twitterUrl, instagramUrl, linkedinUrl, youtubeUrl } = req.body;
+        const { appName, logoUrl, facebookUrl, twitterUrl, instagramUrl, linkedinUrl, youtubeUrl, sandboxPayfast, sandboxCloudPrint } = req.body;
 
         // Update SiteConfig
         let settings = await SiteConfig.findOne();
@@ -442,6 +458,8 @@ router.post('/settings', async (req, res) => {
 
         settings.appName = appName;
         settings.logoUrl = logoUrl;
+        settings.sandboxPayfast = (sandboxPayfast === 'on');
+        settings.sandboxCloudPrint = (sandboxCloudPrint === 'on');
         await settings.save();
 
         // Update FooterSetting
@@ -505,6 +523,155 @@ router.get('/orders', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
+    }
+});
+
+// CloudPrinter Order Details
+router.get('/cloudprinter/order-details/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const order = await CpOrder.findByPk(id, {
+            include: [
+                { model: CpAddress },
+                {
+                    model: CpOrderItem,
+                    include: [
+                        { model: CpFile },
+                        { model: Workshop }
+                    ]
+                }
+            ]
+        });
+
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+
+        // Parse extra details from fullJsonPayload
+        let extra = {};
+        try {
+            if (order.fullJsonPayload) {
+                const payload = JSON.parse(order.fullJsonPayload);
+                // Depending on structure (sometimes wrapped in "order" key, sometimes not)
+                const root = payload.order || payload;
+                extra = {
+                    shipping: root.shipping,
+                    priority: root.priority,
+                    client: root.client,
+                    rawItems: root.items // Contains options which we might need
+                };
+            }
+        } catch (e) {
+            console.warn('Failed to parse fullJsonPayload', e);
+        }
+
+        res.json({ success: true, order, extra });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// CloudPrinter File Operations
+router.post('/cloudprinter/download-file', async (req, res) => {
+    try {
+        const { cpFileId } = req.body;
+        const file = await CpFile.findByPk(cpFileId, {
+            include: [
+                { model: CpOrder },
+                {
+                    model: CpOrderItem,
+                    include: [{ model: CpOrder }]
+                }
+            ]
+        });
+
+        if (!file) return res.status(404).json({ success: false, error: 'File not found' });
+
+        const orderNo = file.CpOrder ? file.CpOrder.cpOrderId :
+            (file.CpOrderItem && file.CpOrderItem.CpOrder ? file.CpOrderItem.CpOrder.cpOrderId : 'Unknown');
+
+        // Simulate downloading to a "hotfolder"
+        const fs = require('fs');
+        const path = require('path');
+        const hotfolder = path.join(__dirname, '../public/hotfolder');
+
+        if (!fs.existsSync(hotfolder)) {
+            fs.mkdirSync(hotfolder, { recursive: true });
+        }
+
+        // Mock Download: In real life, use axios to stream file.url to destination
+        // Here we just create a dummy file
+        const fileName = `${file.type}_${file.id}.pdf`;
+        const destPath = path.join(hotfolder, fileName);
+
+        // Create a minimal valid PDF (1.7) so browsers don't complain
+        const pdfContent = `%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 59 >>
+stream
+BT
+/F1 24 Tf
+50 700 Td
+(Dummy File: ${file.type} for Order No ${orderNo}) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f
+0000000009 00000 n
+0000000060 00000 n
+0000000117 00000 n
+0000000216 00000 n
+trailer
+<< /Size 5 /Root 1 0 R >>
+startxref
+325
+%%EOF`;
+        fs.writeFileSync(destPath, Buffer.from(pdfContent));
+
+        // Save local path
+        file.localPath = destPath;
+        await file.save();
+
+        res.json({ success: true, message: 'File downloaded to hotfolder', localPath: fileName });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/cloudprinter/delete-file', async (req, res) => {
+    try {
+        const { cpFileId } = req.body;
+        const file = await CpFile.findByPk(cpFileId);
+
+        if (!file || !file.localPath) return res.status(404).json({ success: false, error: 'File or local path not found' });
+
+        const fs = require('fs');
+        if (fs.existsSync(file.localPath)) {
+            fs.unlinkSync(file.localPath);
+            file.localPath = null;
+            await file.save();
+            res.json({ success: true, message: 'File deleted from hotfolder' });
+        } else {
+            // It might have been deleted manually
+            file.localPath = null;
+            await file.save();
+            res.json({ success: true, message: 'File record updated (file was missing)' });
+        }
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
