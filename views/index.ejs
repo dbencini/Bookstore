@@ -55,20 +55,44 @@
                 </li>
 
                 <!-- Page Numbers -->
-                <% for(let i=1; i <=totalPages; i++) { %>
-                    <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                <% let startPage=Math.max(1, currentPage - 2); let endPage=Math.min(totalPages, currentPage + 2); if
+                    (startPage> 1) { %>
+                    <li class="page-item">
                         <a class="page-link"
-                            href="/books?page=<%= i %>&search=<%= search || '' %>&category=<%= category || '' %>">
-                            <%= i %>
-                        </a>
+                            href="/books?page=1&search=<%= search || '' %>&category=<%= category || '' %>">1</a>
                     </li>
-                    <% } %>
+                    <% if (startPage> 2) { %>
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        <% } %>
+                            <% } %>
 
-                        <!-- Next Button -->
-                        <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
-                            <a class="page-link"
-                                href="/books?page=<%= currentPage + 1 %>&search=<%= search || '' %>&category=<%= category || '' %>">Next</a>
-                        </li>
+                                <% for(let i=startPage; i <=endPage; i++) { %>
+                                    <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                                        <a class="page-link"
+                                            href="/books?page=<%= i %>&search=<%= search || '' %>&category=<%= category || '' %>">
+                                            <%= i %>
+                                        </a>
+                                    </li>
+                                    <% } %>
+
+                                        <% if (endPage < totalPages) { %>
+                                            <% if (endPage < totalPages - 1) { %>
+                                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                                <% } %>
+                                                    <li class="page-item">
+                                                        <a class="page-link"
+                                                            href="/books?page=<%= totalPages %>&search=<%= search || '' %>&category=<%= category || '' %>">
+                                                            <%= totalPages %>
+                                                        </a>
+                                                    </li>
+                                                    <% } %>
+
+                                                        <!-- Next Button -->
+                                                        <li
+                                                            class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                                                            <a class="page-link"
+                                                                href="/books?page=<%= currentPage + 1 %>&search=<%= search || '' %>&category=<%= category || '' %>">Next</a>
+                                                        </li>
             </ul>
         </nav>
     </div>

@@ -1,0 +1,720 @@
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Import & Maintenance</h1>
+        <a href="/admin" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <% if (success) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <% if (success==='CSVImported' ) { %>
+                Import successful! Added <%= added %> books.
+                    <% } else if (success==='AllBooksDeleted' ) { %>
+                        All books have been successfully deleted.
+                        <% } else if (success==='FixJobStarted' ) { %>
+                            Thumbnail fix job has been started. Check background jobs for progress.
+                            <% } else { %>
+                                Operation successful.
+                                <% } %>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"
+                                        aria-label="Close"></button>
+        </div>
+        <% } %>
+
+            <% if (error) { %>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Error: <%= error %>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                <% } %>
+
+                    <!-- Global Progress Section -->
+                    <div id="progressContainer" class="card shadow-sm border-0 mb-4 d-none">
+                        <div class="card-body bg-light">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0 fw-bold" id="progressLabel">Background Job</h6>
+                                <span class="badge bg-primary px-3 py-2" id="progressPercent">0%</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 15px;">
+                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                    role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <div id="progressSummary" class="text-muted small mb-3"></div>
+
+                            <div id="jobControls" class="d-flex gap-2 d-none">
+                                <button type="button" id="pauseJobBtn" class="btn btn-warning btn-md px-4">
+                                    <i class="bi bi-pause-fill me-1"></i> Pause Job
+                                </button>
+                                <button type="button" id="resumeJobBtn" class="btn btn-success btn-md px-4 d-none">
+                                    <i class="bi bi-play-fill me-1"></i> Resume Job
+                                </button>
+                                <button type="button" id="stopJobBtn" class="btn btn-danger btn-md px-4">
+                                    <i class="bi bi-stop-fill me-1"></i> Stop Job
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-4">
+                        <!-- Import from CSV/ZIP -->
+                        <div class="col-md-6">
+                            <div class="card h-100 shadow-sm border-0">
+                                <div class="card-header bg-primary text-white py-3">
+                                    <h5 class="card-title mb-0"><i class="bi bi-file-earmark-zip me-2"></i> Import Books
+                                        (CSV or ZIP)</h5>
+                                </div>
+                                <div class="card-body py-4">
+                                    <p class="text-muted small mb-4">
+                                        Upload a CSV or ZIP file to bulk import books.
+                                        <strong>Markup:</strong> Cost prices will be increased by the specified
+                                        percentage.
+                                    </p>
+                                    <form id="importForm" enctype="multipart/form-data">
+                                        <div class="mb-3">
+                                            <label for="markup" class="form-label fw-bold">Markup Percentage (%)</label>
+                                            <input type="number" class="form-control" id="markup" name="markup"
+                                                value="0" min="0" step="0.1">
+                                        </div>
+                                        <div class="mb-4">
+                                            <label for="csvFile" class="form-label fw-bold">Select CSV/ZIP File</label>
+                                            <input class="form-control" type="file" id="csvFile" name="csvFile"
+                                                accept=".csv,.zip">
+                                        </div>
+
+
+                                        <div class="d-grid gap-2">
+                                            <button type="submit" id="startImportBtn" class="btn btn-primary">
+                                                <i class="bi bi-upload me-2"></i> Start Upload Import
+                                            </button>
+                                            <div class="text-center my-1 small text-muted">-- OR --</div>
+                                            <button type="button" id="manualZipBtn" class="btn btn-outline-primary">
+                                                <i class="bi bi-folder-symlink me-2"></i> Import from library.zip
+                                            </button>
+                                            <div class="text-center mt-1"><small class="text-muted"
+                                                    style="font-size: 0.65rem;">(Place library.zip in /uploads/
+                                                    first)</small></div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Maintenance Actions -->
+                        <div class="col-md-6">
+                            <div class="card h-100 shadow-sm border-0">
+                                <div class="card-header bg-dark text-white py-3">
+                                    <h5 class="card-title mb-0"><i class="bi bi-shield-lock me-2"></i> Maintenance &
+                                        Utility</h5>
+                                </div>
+                                <div class="card-body d-flex flex-column justify-content-center py-4">
+                                    <div class="mb-4">
+                                        <h6 class="fw-bold mb-2">Repair Missing Data</h6>
+                                        <p class="text-muted small mb-3">
+                                            Scans library for books with missing descriptions, authors, ISBNs, or
+                                            placeholder images.
+                                            Uses ISBN lookup where available for high accuracy.
+                                        </p>
+                                        <div class="d-grid gap-2">
+                                            <button type="button" id="startRepairBtn" class="btn btn-outline-info">
+                                                <i class="bi bi-tools me-2"></i> Repair Authors, Descs & Covers (API)
+                                            </button>
+                                            <button type="button" id="startUltimateBtn" class="btn btn-outline-success">
+                                                <i class="bi bi-rocket-takeoff me-2"></i> Ultimate Repair (Open Library
+                                                Bulk)
+                                            </button>
+                                            <button type="button" id="showStatsBtn" class="btn btn-outline-primary">
+                                                <i class="bi bi-bar-chart-line me-2"></i> Book Stats & Health Report
+                                            </button>
+                                            <button type="button" id="sampleHugeFileBtn"
+                                                class="btn btn-outline-warning">
+                                                <i class="bi bi-file-earmark-text me-2"></i> Sample GoogleHugeFile.txt
+                                            </button>
+                                        </div>
+                                        <div id="ultimateStatus" class="mt-3 p-3 bg-light rounded d-none">
+                                            <div class="d-flex justify-content-between small mb-1">
+                                                <span>Dump File:</span>
+                                                <span id="dumpFileStatus" class="fw-bold text-muted">Checking...</span>
+                                            </div>
+                                            <div class="alert alert-warning p-2 mb-0 mt-2" style="font-size: 0.75rem;">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                                <strong>Disk Warning:</strong> Requires ~30GB for the uncompressed
+                                                stream.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <hr class="my-4">
+
+                                <div>
+                                    <h6 class="fw-bold mb-2 text-danger">Danger Zone</h6>
+                                    <p class="text-muted small mb-3">
+                                        Irreversibly removes <strong>all</strong> book records from the database.
+                                        Use with extreme caution.
+                                    </p>
+                                    <form action="/admin/import/delete-all" method="POST"
+                                        onsubmit="return confirm('Are you absolutely sure? This will delete EVERY book in the system.');">
+                                        <button type="submit" class="btn btn-danger w-100">
+                                            <i class="bi bi-trash3 me-2"></i> Delete All Books
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+</div>
+
+<!-- GoogleHugeFile Sample Modal -->
+<div class="modal fade" id="sampleModal" tabindex="-1" aria-labelledby="sampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sampleModalLabel"><i class="bi bi-file-earmark-text me-2"></i>
+                    GoogleHugeFile.txt (First 10 Rows)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-bordered small">
+                        <thead class="table-dark" id="sampleTableHeader"></thead>
+                        <tbody id="sampleTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="sampleLoading" class="text-center py-5 d-none">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2 text-muted">Reading file sample...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JSON Record Inspector Modal -->
+<div class="modal fade" id="jsonPreviewModal" tabindex="-1" aria-labelledby="jsonPreviewModalLabel" aria-hidden="true"
+    style="z-index: 1060;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="jsonPreviewModalLabel"><i class="bi bi-code-slash me-2"></i> Full Record
+                    Data (Column 5)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <pre id="jsonPreviewContent" class="bg-light p-3 mb-0"
+                    style="max-height: 600px; overflow-y: auto; font-size: 0.85rem; font-family: 'Cascadia Code', 'Fira Code', monospace;"></pre>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Book Stats Modal -->
+<div class="modal fade" id="statsModal" tabindex="-1" aria-labelledby="statsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statsModalLabel"><i class="bi bi-bar-chart-line me-2"></i> Book
+                    Library
+                    Stats</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="statsContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Calculating statistics...</p>
+                    </div>
+                </div>
+                <div id="examplesSection" class="mt-4 d-none">
+                    <hr>
+                    <h6 class="fw-bold mb-3" id="examplesTitle">Representative Examples</h6>
+                    <div id="examplesList"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const importForm = document.getElementById('importForm');
+    const startImportBtn = document.getElementById('startImportBtn');
+    const manualZipBtn = document.getElementById('manualZipBtn');
+    const startRepairBtn = document.getElementById('startRepairBtn');
+    const startUltimateBtn = document.getElementById('startUltimateBtn');
+    const container = document.getElementById('progressContainer');
+    const bar = document.getElementById('progressBar');
+    const label = document.getElementById('progressLabel');
+    const percent = document.getElementById('progressPercent');
+    const summary = document.getElementById('progressSummary');
+    const jobControls = document.getElementById('jobControls');
+    const pauseJobBtn = document.getElementById('pauseJobBtn');
+    const resumeJobBtn = document.getElementById('resumeJobBtn');
+    const stopJobBtn = document.getElementById('stopJobBtn');
+
+    let currentJobId = null;
+
+    // On Load: Check if there's any active job running
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Initialize Modal here where bootstrap is guaranteed to be loaded
+        statsModal = new bootstrap.Modal(document.getElementById('statsModal'));
+        sampleModal = new bootstrap.Modal(document.getElementById('sampleModal'));
+        jsonPreviewModal = new bootstrap.Modal(document.getElementById('jsonPreviewModal'));
+
+        try {
+            // Check Dump Status
+            checkDumpStatus();
+
+            // Check for running OR paused jobs
+            const res = await fetch('/admin/jobs?limit=5', {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            const activeJob = data.jobs.find(j => j.status === 'running' || j.status === 'paused');
+
+            if (activeJob) {
+                container.classList.remove('d-none');
+                jobControls.classList.remove('d-none');
+                label.innerText = activeJob.status === 'paused' ? 'Job Paused' : 'Job in progress...';
+                pollProgress(activeJob.id);
+            }
+        } catch (err) {
+            console.error('Failed to check for active jobs:', err);
+        }
+    });
+
+    async function checkDumpStatus() {
+        try {
+            const res = await fetch('/admin/repair/dump-status', {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            const statusEl = document.getElementById('dumpFileStatus');
+            const divEl = document.getElementById('ultimateStatus');
+
+            divEl.classList.remove('d-none');
+            if (data.exists) {
+                statusEl.innerText = `Present (${data.sizeLabel})`;
+                statusEl.className = 'fw-bold text-success';
+            } else {
+                statusEl.innerText = 'Not Found (Will Download)';
+                statusEl.className = 'fw-bold text-warning';
+            }
+        } catch (e) { }
+    }
+
+    async function handleImport(url, body, isFormData = true) {
+        startImportBtn.disabled = true;
+        manualZipBtn.disabled = true;
+        if (startRepairBtn) startRepairBtn.disabled = true;
+
+        container.classList.remove('d-none');
+        bar.style.width = '0%';
+        bar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+        label.innerText = 'Initializing...';
+        summary.innerText = '';
+
+        try {
+            const options = { method: 'POST', body };
+            options.headers = options.headers || {};
+            options.headers['Accept'] = 'application/json';
+            if (!isFormData) options.headers['Content-Type'] = 'application/json';
+
+            const response = await fetch(url, options);
+            const result = await response.json();
+
+            if (result.success && result.jobId) {
+                pollProgress(result.jobId);
+            } else if (result.jobId) {
+                // If job exists but is paused/running, we still poll it
+                pollProgress(result.jobId);
+            } else {
+                alert('Error starting job: ' + (result.error || 'Unknown error'));
+                resetButtons();
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Failed to start job.');
+            resetButtons();
+        }
+    }
+
+    function resetButtons() {
+        startImportBtn.disabled = false;
+        manualZipBtn.disabled = false;
+        if (startRepairBtn) startRepairBtn.disabled = false;
+        if (startUltimateBtn) startUltimateBtn.disabled = false;
+    }
+
+    importForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const csvFile = document.getElementById('csvFile').files[0];
+        if (!csvFile) {
+            alert('Please select a file to upload.');
+            return;
+        }
+        handleImport('/admin/import/csv', new FormData(importForm));
+    });
+
+    manualZipBtn.addEventListener('click', () => {
+        const markup = document.getElementById('markup').value;
+        handleImport('/admin/import/manual-zip', JSON.stringify({ markup }), false);
+    });
+
+    if (startRepairBtn) {
+        startRepairBtn.addEventListener('click', () => {
+            handleImport('/admin/import/fix-thumbnails', null, false);
+        });
+    }
+
+    if (startUltimateBtn) {
+        startUltimateBtn.addEventListener('click', () => {
+            if (!confirm('This will download a ~10GB file and scan it. It is very fast for matching but requires disk space. Continue?')) return;
+            handleImport('/admin/import/ultimate-repair', null, false);
+        });
+    }
+
+    pauseJobBtn.addEventListener('click', async () => {
+        if (!currentJobId) return;
+        try {
+            const res = await fetch(`/admin/jobs/${currentJobId}/pause`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (!data.success) alert(data.error || 'Failed to pause job.');
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    resumeJobBtn.addEventListener('click', async () => {
+        if (!currentJobId) return;
+        try {
+            const res = await fetch(`/admin/jobs/${currentJobId}/resume`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (!data.success) alert(data.error || 'Failed to resume job.');
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    stopJobBtn.addEventListener('click', async () => {
+        if (!currentJobId) return;
+        if (!confirm('Are you sure you want to stop this job? It can be resumed later if the type supports it.')) return;
+        try {
+            const res = await fetch(`/admin/jobs/${currentJobId}/stop`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (!data.success) alert(data.error || 'Failed to stop job.');
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    async function pollProgress(jobId) {
+        currentJobId = jobId;
+        // Disable buttons if polling starts (e.g. from on-load)
+        startImportBtn.disabled = true;
+        manualZipBtn.disabled = true;
+        if (startRepairBtn) startRepairBtn.disabled = true;
+        if (startUltimateBtn) startUltimateBtn.disabled = true;
+        jobControls.classList.remove('d-none');
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/admin/jobs/${jobId}/status`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+
+                const p = data.progress || 0;
+                bar.style.width = p + '%';
+                percent.innerText = p + '%';
+
+                // Special formatting for Ultimate Repair
+                if (data.type === 'ultimate_repair' && data.summary.includes('Scanned')) {
+                    // Extract stats if available in summary string
+                    summary.innerHTML = `<div class="p-2 border rounded bg-white mt-1 shadow-sm">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-secondary"><i class="bi bi-search me-1"></i> Records Scanned:</span>
+                            <span class="fw-bold">${data.summary.match(/Scanned ([\d,]+)/)?.[1] || '...'}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-success"><i class="bi bi-patch-check me-1"></i> Local Matches:</span>
+                            <span class="fw-bold">${data.fixedCount?.toLocaleString() || '0'}</span>
+                        </div>
+                    </div>`;
+                } else {
+                    summary.innerText = data.summary || '';
+                }
+
+                if (data.status === 'running') {
+                    label.innerText = 'Processing...';
+                    bar.classList.add('progress-bar-animated');
+                    pauseJobBtn.classList.remove('d-none');
+                    resumeJobBtn.classList.add('d-none');
+                } else if (data.status === 'paused') {
+                    label.innerText = 'Paused';
+                    bar.classList.remove('progress-bar-animated');
+                    pauseJobBtn.classList.add('d-none');
+                    resumeJobBtn.classList.remove('d-none');
+                }
+
+                if (data.status === 'completed') {
+                    clearInterval(interval);
+                    label.innerText = 'Job Complete!';
+                    bar.classList.remove('progress-bar-animated');
+                    bar.classList.add('bg-success');
+                    jobControls.classList.add('d-none');
+                    setTimeout(() => {
+                        window.location.href = '/admin/import?success=JobFinished&type=' + (data.type || 'unknown');
+                    }, 1500);
+                } else if (data.status === 'failed') {
+                    clearInterval(interval);
+                    label.innerText = 'Job Failed';
+                    bar.classList.add('bg-danger');
+                    bar.classList.remove('progress-bar-animated');
+                    // jobControls.classList.add('d-none');
+                    alert('Job failed (possibly server timeout). You can try again. Details: ' + data.summary);
+                    resetButtons();
+                } else if (data.status === 'stopped' || data.status === 'cancelled') {
+                    clearInterval(interval);
+                    label.innerText = 'Job Stopped';
+                    bar.classList.add('bg-warning');
+                    bar.classList.remove('progress-bar-animated');
+                    // jobControls.classList.add('d-none');
+                    resetButtons();
+                }
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        }, 1000);
+    }
+
+    // Book Stats Logic - Moved into DOMContentLoaded but defined variables here
+    let statsModal; // Will be initialized in DOMContentLoaded
+    const statsContent = document.getElementById('statsContent');
+    const showStatsBtn = document.getElementById('showStatsBtn');
+    const examplesSection = document.getElementById('examplesSection');
+    const examplesList = document.getElementById('examplesList');
+    const examplesTitle = document.getElementById('examplesTitle');
+
+    // GoogleHugeFile Sample Logic
+    let sampleModal; // Will be initialized in DOMContentLoaded
+    let jsonPreviewModal; // Will be initialized in DOMContentLoaded
+    const sampleHugeFileBtn = document.getElementById('sampleHugeFileBtn');
+    const sampleTableHeader = document.getElementById('sampleTableHeader');
+    const sampleTableBody = document.getElementById('sampleTableBody');
+    const sampleLoading = document.getElementById('sampleLoading');
+
+    if (sampleHugeFileBtn) {
+        sampleHugeFileBtn.addEventListener('click', async () => {
+            sampleModal.show();
+            sampleLoading.classList.remove('d-none');
+            sampleTableHeader.innerHTML = '';
+            sampleTableBody.innerHTML = '';
+
+            try {
+                const res = await fetch('/admin/repair/google-huge-file/sample', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                sampleLoading.classList.add('d-none');
+
+                if (data.success && data.rows.length > 0) {
+                    // Create headers based on column count
+                    let headerHtml = '<tr>';
+                    for (let i = 0; i < data.rows[0].length; i++) {
+                        headerHtml += `<th>Col ${i + 1}</th>`;
+                    }
+                    headerHtml += '</tr>';
+                    sampleTableHeader.innerHTML = headerHtml;
+
+                    // Fill rows
+                    let bodyHtml = '';
+                    data.rows.forEach((row, rowIndex) => {
+                        bodyHtml += '<tr>';
+                        row.forEach((cell, colIndex) => {
+                            if (colIndex === 4) { // Data Column
+                                bodyHtml += `<td>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <code class="text-truncate d-inline-block" style="max-width: 300px;">${cell.substring(0, 50)}...</code>
+                                        <button class="btn btn-sm btn-link py-0" onclick="inspectJson(${rowIndex})">
+                                            <i class="bi bi-zoom-in"></i> Inspect
+                                        </button>
+                                    </div>
+                                </td>`;
+                            } else {
+                                const displayValue = cell.length > 100 ? cell.substring(0, 97) + '...' : cell;
+                                bodyHtml += `<td class="text-break">${displayValue}</td>`;
+                            }
+                        });
+                        bodyHtml += '</tr>';
+                    });
+                    sampleTableBody.innerHTML = bodyHtml;
+                    // Store rows for inspection
+                    window.currentSampleRows = data.rows;
+                } else {
+                    sampleTableBody.innerHTML = `<tr><td colspan="100%" class="text-center py-4 text-muted">${data.error || 'No data found in file.'}</td></tr>`;
+                }
+            } catch (err) {
+                sampleLoading.classList.add('d-none');
+                sampleTableBody.innerHTML = `<tr><td colspan="100%" class="text-center py-4 text-danger">Failed to read file: ${err.message}</td></tr>`;
+            }
+        });
+    }
+
+    // Global function for the Inspect button
+    window.inspectJson = function (rowIndex) {
+        if (!window.currentSampleRows || !window.currentSampleRows[rowIndex]) return;
+        const rawJson = window.currentSampleRows[rowIndex][4];
+        const displayEl = document.getElementById('jsonPreviewContent');
+
+        try {
+            const obj = JSON.parse(rawJson);
+            displayEl.innerText = JSON.stringify(obj, null, 4);
+            displayEl.classList.remove('text-danger');
+        } catch (e) {
+            displayEl.innerText = rawJson; // Fallback to raw if not valid JSON
+            displayEl.classList.add('text-danger');
+        }
+
+        jsonPreviewModal.show();
+    };
+
+    if (showStatsBtn) {
+        showStatsBtn.addEventListener('click', async () => {
+            if (statsModal) statsModal.show();
+            statsContent.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Calculating statistics...</p></div>`;
+            examplesSection.classList.add('d-none');
+
+            try {
+                const res = await fetch('/admin/repair/stats', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const s = data.stats;
+                    statsContent.innerHTML = `
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('total', 'Total Books')">
+                                    <div class="h3 mb-0 fw-bold">${s.total.toLocaleString()}</div>
+                                    <div class="small text-muted">Total Books</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('hasAuthor', 'Has Author')">
+                                    <div class="h3 mb-0 fw-bold text-success">${s.hasAuthor.toLocaleString()}</div>
+                                    <div class="small text-muted">With Authors</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('missingAuthor', 'Missing Author')">
+                                    <div class="h3 mb-0 fw-bold text-danger">${s.missingAuthor.toLocaleString()}</div>
+                                    <div class="small text-muted">Missing Authors</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('hasDesc', 'Has Description')">
+                                    <div class="h3 mb-0 fw-bold text-success">${s.hasDesc.toLocaleString()}</div>
+                                    <div class="small text-muted">With Descriptions</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('missingDesc', 'Missing Description')">
+                                    <div class="h3 mb-0 fw-bold text-danger">${s.missingDesc.toLocaleString()}</div>
+                                    <div class="small text-muted">Missing Descriptions</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('hasThumb', 'Has Image')">
+                                    <div class="h3 mb-0 fw-bold text-success">${s.hasThumb.toLocaleString()}</div>
+                                    <div class="small text-muted">With Images</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('missingThumb', 'Missing Image')">
+                                    <div class="h3 mb-0 fw-bold text-danger">${s.missingThumb.toLocaleString()}</div>
+                                    <div class="small text-muted">Missing Images</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('hasCost', 'Has Cost Price')">
+                                    <div class="h3 mb-0 fw-bold text-primary">${s.hasCost.toLocaleString()}</div>
+                                    <div class="small text-muted">With Cost Price</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light text-center" style="cursor: pointer;" onclick="loadExamples('hasSale', 'Has Sale Price')">
+                                    <div class="h3 mb-0 fw-bold text-primary">${s.hasSale.toLocaleString()}</div>
+                                    <div class="small text-muted">With Sale Price</div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mt-3 small text-muted text-center"><i class="bi bi-info-circle me-1"></i> Click a category above to view sample books.</p>
+                    `;
+                }
+            } catch (err) {
+                statsContent.innerHTML = `<div class="alert alert-danger">Failed to load stats.</div>`;
+            }
+        });
+    }
+
+    window.loadExamples = async (category, label) => {
+        examplesSection.classList.remove('d-none');
+        examplesTitle.innerText = `Examples: ${label}`;
+        examplesList.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></div>`;
+
+        try {
+            const res = await fetch(`/admin/repair/stats/examples?category=${category}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success && data.books.length > 0) {
+                examplesList.innerHTML = `
+                    <div class="list-group shadow-sm">
+                        ${data.books.map(b => `
+                            <div class="list-group-item list-group-item-action p-2">
+                                <div class="d-flex align-items-center">
+                                    <img src="${b.imageUrl || '/images/placeholder-book.png'}" style="width: 40px; height: 60px; object-fit: cover;" class="rounded me-3 border">
+                                    <div class="flex-grow-1" style="min-width: 0;">
+                                        <div class="fw-bold text-truncate small">${b.title}</div>
+                                        <div class="text-muted" style="font-size: 0.75rem;">${b.author || 'Unknown Author'}</div>
+                                    </div>
+                                    <div class="text-end ms-2" style="font-size: 0.7rem;">
+                                        <div class="text-muted">${b.isbn || 'No ISBN'}</div>
+                                        <div class="fw-bold text-primary">$${b.price ? b.price.toFixed(2) : '0.00'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                examplesList.innerHTML = `<div class="alert alert-info py-2 small">No examples found for this category.</div>`;
+            }
+        } catch (err) {
+            examplesList.innerHTML = `<div class="alert alert-danger py-2 small">Failed to load examples.</div>`;
+        }
+    };
+</script>

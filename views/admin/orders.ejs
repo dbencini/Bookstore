@@ -104,7 +104,7 @@
 
     <!-- Pagination -->
     <% if (totalPages> 1) { %>
-        <div class="admin-panel-dark p-2 rounded mt-3">
+        <div class="p-2 rounded mt-3">
             <nav>
                 <ul class="pagination justify-content-center mb-0">
                     <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
@@ -131,9 +131,9 @@
     <div class="modal-dialog modal-lg" style="max-width: 900px;">
         <!-- Widened by roughly 100px from standard lg (800px) -->
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">Order CRM</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="row">
@@ -176,67 +176,6 @@
         </div>
     </div>
 </div>
-
-<style>
-    /* Fix for Dark Mode text in White Modals */
-    [data-theme="dark"] #crmModal .modal-content {
-        background-color: #343a40;
-        /* Dark background for modal */
-        color: #f8f9fa;
-        /* Light text */
-    }
-
-    [data-theme="dark"] #crmModal .form-control {
-        background-color: #454d55;
-        border-color: #565e64;
-        color: #f8f9fa;
-    }
-
-    [data-theme="dark"] #crmModal .btn-close {
-        filter: invert(1) grayscale(100%) brightness(200%);
-    }
-
-    /* Workshop Table Dark Mode Fixes */
-    [data-theme="dark"] #modalWorkshop {
-        background-color: #454d55 !important;
-        /* Dark background instead of bg-light */
-        border-color: #565e64 !important;
-    }
-
-    [data-theme="dark"] #modalWorkshop .table {
-        color: #f8f9fa;
-        border-color: #565e64;
-    }
-
-    [data-theme="dark"] #modalWorkshop .table-light th {
-        background-color: #343a40;
-        color: #f8f9fa;
-        border-color: #565e64;
-    }
-
-    [data-theme="dark"] #modalWorkshop .table-bordered td,
-    [data-theme="dark"] #modalWorkshop .table-bordered th {
-        border-color: #565e64;
-    }
-
-    /* Note list dark mode fix */
-    [data-theme="dark"] #modalNotesList {
-        background-color: #454d55 !important;
-        border-color: #565e64 !important;
-    }
-
-    [data-theme="dark"] #modalNotesList .card {
-        background-color: #343a40;
-        color: #f8f9fa !important;
-        /* Override inline black style */
-    }
-
-    [data-theme="dark"] #addNoteForm .form-control {
-        background-color: #454d55;
-        color: #fff;
-        border-color: #6c757d;
-    }
-</style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {

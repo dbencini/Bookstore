@@ -6,6 +6,7 @@ const CartItem = require('./CartItem');
 const Order = require('./Order');
 const SiteConfig = require('./SiteConfig');
 const Category = require('./Category');
+const BookCategory = require('./BookCategory');
 const Job = require('./Job');
 const OrderNote = require('./OrderNote');
 const FooterSetting = require('./FooterSetting');
@@ -24,8 +25,8 @@ const CpSignal = require('./CpSignal');
 UserType.hasMany(User, { foreignKey: 'userTypeId' });
 User.belongsTo(UserType, { foreignKey: 'userTypeId' });
 
-Category.hasMany(Book, { foreignKey: 'categoryId' });
-Book.belongsTo(Category, { foreignKey: 'categoryId' });
+Book.belongsToMany(Category, { through: BookCategory });
+Category.belongsToMany(Book, { through: BookCategory });
 
 Job.hasMany(Book);
 Book.belongsTo(Job);
@@ -93,6 +94,7 @@ module.exports = {
     Order,
     SiteConfig,
     Category,
+    BookCategory,
     Job,
     FooterSetting,
     OrderNote,

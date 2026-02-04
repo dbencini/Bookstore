@@ -1,0 +1,24 @@
+﻿[dotenv@17.2.3] injecting env (8) from .env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ≡ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+--- Migration Verification ---
+Table                |       SQLite |        MySQL | Status
+------------------------------------------------------------
+UserTypes            |            3 |            3 | OK
+Users                |           28 |           28 | OK
+Categories           |           40 |           40 | OK
+Jobs                 |           48 |           48 | OK
+Books                |    4┬á940┬á921 |    4┬á940┬á921 | OK
+BookCategories       |    4┬á940┬á922 |      149┬á536 | MISSING
+OrderSources         |            2 |            2 | OK
+Orders               |           22 |            9 | MISSING
+OrderNotes           |            9 |            0 | MISSING
+OrderItems           |           37 |            0 | MISSING
+Workshops            |           40 |            0 | MISSING
+SiteConfigs          |            1 |            0 | MISSING
+FooterSettings       |            1 |            0 | MISSING
+CartItems            |            0 |            0 | OK
+CpOrders             |           -1 |            0 | EXTRA
+CpOrderItems         |           -1 |            0 | EXTRA
+CpAddresses          |           -1 |            0 | EXTRA
+CpFiles              |           -1 |            0 | EXTRA
+CpSignals            |           -1 |            0 | EXTRA

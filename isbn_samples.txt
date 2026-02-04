@@ -1,0 +1,23 @@
+No enriched found, here are any 5:
+[
+  {
+    "isbn": "9783753460925",
+    "title": "Ritter und Burgdamen ganz privat!"
+  },
+  {
+    "isbn": "9781146611565",
+    "title": "-The Works of Joseph Addison"
+  },
+  {
+    "isbn": "9789528005636",
+    "title": "Valon ja varjon tiellä - Pohdintoja henkisen matkan solmukohdista"
+  },
+  {
+    "isbn": "9783540010432",
+    "title": "Die Krankheiten Des Gehororgans"
+  },
+  {
+    "isbn": "9781447510819",
+    "title": "Four Sides to the Core"
+  }
+]

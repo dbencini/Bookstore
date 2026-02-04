@@ -4,7 +4,7 @@
     <div class="row">
         <div class="col-md-4">
             <div class="card text-white bg-primary mb-3">
-                <div class="card-header">Total Users</div>
+                <div class="card-header text-white-50">Total Users</div>
                 <div class="card-body">
                     <h5 class="card-title display-4">
                         <%= userCount %>
@@ -14,7 +14,7 @@
         </div>
         <div class="col-md-4">
             <div class="card text-white bg-success mb-3">
-                <div class="card-header">Total Books</div>
+                <div class="card-header text-white-50">Total Books</div>
                 <div class="card-body">
                     <h5 class="card-title display-4">
                         <%= bookCount %>
@@ -23,8 +23,8 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card text-white bg-warning mb-3">
-                <div class="card-header">Admin Users</div>
+            <div class="card text-dark bg-warning mb-3">
+                <div class="card-header text-dark-50">Admin Users</div>
                 <div class="card-body">
                     <h5 class="card-title display-4">
                         <%= adminCount %>
@@ -57,6 +57,9 @@
             </a>
             <a href="/admin/workshop" class="list-group-item list-group-item-action">
                 <i class="bi bi-tools me-2"></i> Workshop Tasks
+            </a>
+            <a href="/admin/import" class="list-group-item list-group-item-action">
+                <i class="bi bi-file-earmark-arrow-up me-2"></i> Import Books
             </a>
 
         </div>

@@ -49,7 +49,28 @@ const Book = sequelize.define('Book', {
     isVisible: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+    },
+    price_cost: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true
+    },
+    bind: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    status: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    pur: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
+}, {
+    indexes: [
+        { unique: true, fields: ['isbn'] },
+        { fields: ['title'] }
+    ]
 });
 
 module.exports = Book;

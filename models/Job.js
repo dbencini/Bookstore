@@ -22,6 +22,26 @@ const Job = sequelize.define('Job', {
         type: DataTypes.INTEGER,
         defaultValue: 0
     },
+    progress: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    lastProcessedId: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    processedCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    fixedCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    removedCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
     startTime: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW

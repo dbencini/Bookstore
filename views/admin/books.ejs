@@ -19,7 +19,7 @@
         <div class="collapse <%= (filters && (filters.title || filters.author || filters.isbn || filters.category || filters.startDate || filters.endDate)) ? 'show' : '' %>"
             id="searchPanel">
             <div class="card-body">
-                <form action="/admin/books" method="GET" class="row g-3">
+                <form action="/admin/books" method="GET" class="row g-3" id="adminSearchForm">
                     <div class="col-md-3">
                         <label class="form-label">Title</label>
                         <input type="text" name="title" class="form-control form-control-sm"
@@ -51,7 +51,7 @@
                         </div>
                     </div>
                     <div class="col-12 text-end">
-                        <a href="/admin/books" class="btn btn-sm btn-secondary me-2">Clear</a>
+                        <a href="/admin/books" class="btn btn-sm btn-secondary me-2" id="btnClearFilters">Clear</a>
                         <button type="submit" class="btn btn-sm btn-primary">Search</button>
                     </div>
                 </form>
@@ -63,15 +63,16 @@
 
 
     <style>
-        .table-highlight {
-            background-color: #e2f0fd !important;
-            /* Light blue highlight */
+        .clickable-row {
+            cursor: pointer;
         }
 
-        [data-theme="dark"] .table-highlight {
-            background-color: #375a7f !important;
-            /* Darker blue for dark mode */
-            color: white;
+        .clickable-row:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .table-highlight {
+            background-color: rgba(0, 123, 255, 0.2) !important;
         }
     </style>
 
@@ -91,7 +92,13 @@
         </thead>
         <tbody>
             <% books.forEach(book=> { %>
-                <tr id="tr-<%= book.id %>">
+                <tr id="tr-<%= book.id %>" class="clickable-row" data-id="<%= book.id %>" data-title="<%= book.title %>"
+                    data-author="<%= book.author %>" data-isbn="<%= book.isbn || '' %>" data-price="<%= book.price %>"
+                    data-categories='<%= JSON.stringify((book.Categories || []).map(c => c.id)) %>'
+                    data-image="<%= book.imageUrl %>" data-stock="<%= book.stock %>"
+                    data-is-visible="<%= book.isVisible %>"
+                    data-created-at="<%= new Date(book.createdAt).toLocaleString() %>"
+                    data-updated-at="<%= new Date(book.updatedAt).toLocaleString() %>">
                     <td>
                         <img src="<%= book.imageUrl %>" alt="Cover" class="img-thumbnail" style="height: 60px;">
                     </td>
@@ -110,7 +117,18 @@
                         R<%= book.price ? book.price.toFixed(2) : '0.00' %>
                     </td>
                     <td>
-                        <%= book.Category ? book.Category.name : 'Uncategorized' %>
+                        <% if (book.Categories && book.Categories.length> 0) { %>
+                            <% book.Categories.slice(0, 3).forEach(cat=> { %>
+                                <span class="badge bg-secondary mb-1">
+                                    <%= cat.name %>
+                                </span>
+                                <% }) %>
+                                    <% if (book.Categories.length> 3) { %>
+                                        <span class="badge bg-dark mb-1">+<%= book.Categories.length - 3 %></span>
+                                        <% } %>
+                                            <% } else { %>
+                                                <span class="text-muted small">Uncategorized</span>
+                                                <% } %>
                     </td>
                     <td>
                         <%= new Date(book.createdAt).toLocaleDateString() %>
@@ -135,18 +153,6 @@
                                 <i class="bi <%= book.isVisible ? 'bi-eye-slash' : 'bi-eye' %>"></i>
                             </button>
 
-                            <!-- Image Update Trigger (Modal or Popover ideal, avoiding complex JS for now, using simple input toggle or a compact inline form) -->
-                            <!-- Using a simple inline form for image URL for now -->
-                            <!-- Edit Trigger -->
-                            <button type="button" class="btn btn-sm btn-outline-primary edit-book-btn"
-                                data-id="<%= book.id %>" data-title="<%= book.title %>" data-author="<%= book.author %>"
-                                data-isbn="<%= book.isbn || '' %>" data-price="<%= book.price %>"
-                                data-category-id="<%= book.categoryId %>" data-image="<%= book.imageUrl %>"
-                                data-stock="<%= book.stock %>" data-is-visible="<%= book.isVisible %>"
-                                data-created-at="<%= new Date(book.createdAt).toLocaleString() %>"
-                                data-updated-at="<%= new Date(book.updatedAt).toLocaleString() %>">
-                                <i class="bi bi-pencil"></i>
-                            </button>
                             <!-- Hidden Description to avoid Quote/Newline attribute issues -->
                             <div id="desc-<%= book.id %>" class="d-none">
                                 <%= book.description %>
@@ -160,25 +166,50 @@
 
     <!-- Pagination -->
     <% if (totalPages> 1) { %>
-        <div class="admin-panel-dark p-2 rounded mt-3">
+        <div class="p-2 rounded mt-3">
             <nav aria-label="Book navigation">
                 <ul class="pagination justify-content-center mb-0">
                     <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
                         <a class="page-link"
                             href="/admin/books?page=<%= currentPage - 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Previous</a>
                     </li>
-                    <% for(let i=1; i <=totalPages; i++) { %>
-                        <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                    <% let startPage=Math.max(1, currentPage - 2); let endPage=Math.min(totalPages, currentPage + 2); if
+                        (startPage> 1) { %>
+                        <li class="page-item">
                             <a class="page-link"
-                                href="/admin/books?page=<%= i %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
-                                <%= i %>
-                            </a>
+                                href="/admin/books?page=1&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">1</a>
                         </li>
-                        <% } %>
-                            <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
-                                <a class="page-link"
-                                    href="/admin/books?page=<%= currentPage + 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Next</a>
-                            </li>
+                        <% if (startPage> 2) { %>
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                            <% } %>
+                                <% } %>
+
+                                    <% for(let i=startPage; i <=endPage; i++) { %>
+                                        <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                                            <a class="page-link"
+                                                href="/admin/books?page=<%= i %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
+                                                <%= i %>
+                                            </a>
+                                        </li>
+                                        <% } %>
+
+                                            <% if (endPage < totalPages) { %>
+                                                <% if (endPage < totalPages - 1) { %>
+                                                    <li class="page-item disabled"><span class="page-link">...</span>
+                                                    </li>
+                                                    <% } %>
+                                                        <li class="page-item">
+                                                            <a class="page-link"
+                                                                href="/admin/books?page=<%= totalPages %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
+                                                                <%= totalPages %>
+                                                            </a>
+                                                        </li>
+                                                        <% } %>
+                                                            <li
+                                                                class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                                                                <a class="page-link"
+                                                                    href="/admin/books?page=<%= currentPage + 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Next</a>
+                                                            </li>
                 </ul>
             </nav>
         </div>
@@ -190,7 +221,7 @@
             <div class="modal fade" id="editBookModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
                 <div class="modal-dialog modal-dialog-centered modal-lg" style="min-width: 600px;">
                     <div class="modal-content" style="min-height: 500px;">
-                        <div class="modal-header bg-dark text-white" style="cursor: move;">
+                        <div class="modal-header bg-primary text-white" style="cursor: move;">
                             <h5 class="modal-title">Edit Book</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                                 aria-label="Close"></button>
@@ -234,15 +265,16 @@
                                             </div>
                                             <div class="row">
                                                 <div class="col-md-6 mb-3">
-                                                    <label class="form-label fw-bold">Category</label>
-                                                    <select name="categoryId" id="modalBookCategory"
-                                                        class="form-select">
+                                                    <label class="form-label fw-bold">Categories</label>
+                                                    <select name="categoryIds" id="modalBookCategory"
+                                                        class="form-select" multiple size="5">
                                                         <% categories.forEach(cat=> { %>
                                                             <option value="<%= cat.id %>">
                                                                 <%= cat.name %>
                                                             </option>
                                                             <% }) %>
                                                     </select>
+                                                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label fw-bold">Price (R)</label>
@@ -282,6 +314,35 @@
 
                 <script>
                     document.addEventListener('DOMContentLoaded', function () {
+                        // --- Filter Persistence ---
+                        const FILTER_STORAGE_KEY = 'admin_books_filters';
+                        const adminSearchForm = document.getElementById('adminSearchForm');
+                        const btnClearFilters = document.getElementById('btnClearFilters');
+
+                        // Save Filters on Submit
+                        if (adminSearchForm) {
+                            adminSearchForm.addEventListener('submit', function () {
+                                const formData = new FormData(adminSearchForm);
+                                const params = new URLSearchParams(formData);
+                                localStorage.setItem(FILTER_STORAGE_KEY, params.toString());
+                            });
+                        }
+
+                        // Clear Filters
+                        if (btnClearFilters) {
+                            btnClearFilters.addEventListener('click', function (e) {
+                                localStorage.removeItem(FILTER_STORAGE_KEY);
+                            });
+                        }
+
+                        // Restore Filters if none in URL
+                        const currentQuery = window.location.search;
+                        const savedQuery = localStorage.getItem(FILTER_STORAGE_KEY);
+                        if (!currentQuery && savedQuery && savedQuery !== 'title=&author=&isbn=&category=&startDate=&endDate=') {
+                            window.location.search = savedQuery;
+                            return; // Wait for reload
+                        }
+
                         // --- Persistent Row Highlighting ---
                         const STORAGE_KEY = 'admin_last_clicked_book_id';
                         const savedId = localStorage.getItem(STORAGE_KEY);
@@ -291,28 +352,8 @@
                             const row = document.getElementById('tr-' + savedId);
                             if (row) {
                                 row.classList.add('table-highlight');
-                                row.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Optional: Scroll to it
+                                // row.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Optional: Scroll to it
                             }
-                        }
-
-                        // Attach Click Listener to Rows
-                        const tableBody = document.querySelector('table tbody');
-                        if (tableBody) {
-                            tableBody.addEventListener('click', function (e) {
-                                // Find closest row
-                                const row = e.target.closest('tr');
-                                if (!row || !row.id.startsWith('tr-')) return;
-
-                                // Remove existing highlights
-                                document.querySelectorAll('.table-highlight').forEach(el => el.classList.remove('table-highlight'));
-
-                                // Add highlight to this row
-                                row.classList.add('table-highlight');
-
-                                // Save ID
-                                const bookId = row.id.replace('tr-', '');
-                                localStorage.setItem(STORAGE_KEY, bookId);
-                            });
                         }
 
                         const editModalEl = document.getElementById('editBookModal');
@@ -334,6 +375,10 @@
 
                                 // Checkbox handling
                                 data.isVisible = document.getElementById('modalBookVisible').checked ? 'on' : 'off';
+
+                                // Multiple Select handling
+                                const categorySelect = document.getElementById('modalBookCategory');
+                                data.categoryIds = Array.from(categorySelect.selectedOptions).map(opt => opt.value);
 
                                 try {
                                     const response = await fetch(updateForm.action, {
@@ -361,9 +406,17 @@
                         }
 
                         // --- Populate Modal ---
-                        document.querySelectorAll('.edit-book-btn').forEach(btn => {
-                            btn.addEventListener('click', function () {
+                        document.querySelectorAll('.clickable-row').forEach(row => {
+                            row.addEventListener('click', function (e) {
+                                // If the click was on a button or an icon inside a button, don't trigger modal
+                                if (e.target.closest('button')) return;
+
                                 const ds = this.dataset;
+
+                                // Highlight the row and save ID
+                                document.querySelectorAll('.table-highlight').forEach(el => el.classList.remove('table-highlight'));
+                                this.classList.add('table-highlight');
+                                localStorage.setItem(STORAGE_KEY, ds.id);
 
                                 // Set Form Actions
                                 updateForm.action = `/admin/books/${ds.id}/update`;
@@ -384,7 +437,13 @@
                                 document.getElementById('modalBookDescription').value = descEl ? descEl.textContent.trim() : '';
 
                                 document.getElementById('modalBookStock').value = ds.stock;
-                                document.getElementById('modalBookCategory').value = ds.categoryId;
+
+                                // Handle Multiple Categories
+                                const categorySelect = document.getElementById('modalBookCategory');
+                                const selectedCategoryIds = JSON.parse(ds.categories || '[]');
+                                Array.from(categorySelect.options).forEach(opt => {
+                                    opt.selected = selectedCategoryIds.includes(opt.value);
+                                });
                                 document.getElementById('modalBookPrice').value = ds.price;
                                 document.getElementById('modalBookImage').value = ds.image;
                                 document.getElementById('modalBookThumbnail').src = ds.image;

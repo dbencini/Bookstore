@@ -9,7 +9,7 @@ const path = require('path');
 const { sequelize, User, UserType, SiteConfig, Category, FooterSetting } = require('./models');
 const expressLayouts = require('express-ejs-layouts');
 const adminRoutes = require('./routes/admin');
-const { startCronJob } = require('./services/bookService');
+const { fetchGoogleBooks } = require('./services/bookService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -207,7 +207,6 @@ app.get('/', (req, res) => {
 sequelize.sync().then(() => {
     app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
-        startCronJob();
         console.log(`Debug URL: http://localhost:${PORT}/?cb=${Date.now()}`);
     });
 }).catch(err => {
