@@ -19,13 +19,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use((req, res, next) => {
     if (req.method === 'POST') {
-        console.log(`[Global Debug] POST ${req.url}`, req.body);
-        console.log(`[Global Debug] Headers: Accept=${req.headers.accept}, X-Requested-With=${req.headers['x-requested-with']}`);
+        //  console.log(`[Global Debug] POST ${req.url}`, req.body);
+        //  console.log(`[Global Debug] Headers: Accept=${req.headers.accept}, X-Requested-With=${req.headers['x-requested-with']}`);
     }
 
     res.on('finish', () => {
         if (req.method === 'POST') {
-            console.log(`[Global Debug] Response Status: ${res.statusCode} Content-Type: ${res.get('Content-Type')}`);
+            //    console.log(`[Global Debug] Response Status: ${res.statusCode} Content-Type: ${res.get('Content-Type')}`);
         }
     });
     next();
@@ -144,10 +144,15 @@ app.use(async (req, res, next) => {
         }
 
         // Fetch Categories for Global Menu
-        const categories = await Category.findAll({ order: [['name', 'ASC']] });
+        let categories = [];
+        try {
+            categories = await Category.findAll({ order: [['name', 'ASC']], timeout: 5000 });
+        } catch (catErr) {
+            console.error('Failed to fetch categories for menu:', catErr.message);
+        }
         res.locals.categories = categories;
     } catch (err) {
-        console.error('Error loading site config:', err);
+        console.error('Error loading site config:', err.stack || err);
         res.locals.siteConfig = { appName: 'Fallback POD' };
         res.locals.appName = 'My Bookstore';
         res.locals.appLogo = '/images/logo_v2.svg';
@@ -199,16 +204,21 @@ app.use('/', indexRoutes);
 app.use('/cart', cartRoutes);
 app.use('/admin', adminRoutes);
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('[Global Error Handler]', err.stack || err);
+    res.status(500).send('Internal Server Error: ' + err.message);
+});
+
 app.get('/', (req, res) => {
     res.redirect('/books');
 });
 
 // Sync database and start server
-sequelize.sync().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-        console.log(`Debug URL: http://localhost:${PORT}/?cb=${Date.now()}`);
-    });
-}).catch(err => {
-    console.error('Database sync failed:', err);
+app.listen(PORT, async () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Debug URL: http://localhost:${PORT}/?cb=${Date.now()}`);
 });
+// }).catch(err => {
+//     console.error('Database sync failed:', err);
+// });

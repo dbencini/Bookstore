@@ -6,7 +6,7 @@ const csv = require('csv-parser');
 const unzipper = require('unzipper');
 const zlib = require('zlib');
 const readline = require('readline');
-const { Book, Job, Category, BookCategory, sequelize } = require('../models');
+const { Book, Job, Subject, BookSubject, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 // Configure Google Books API URL
@@ -78,26 +78,21 @@ async function fetchGoogleBooks(query = 'subject:fiction') {
                 description: info.description,
                 price: 19.99,
                 imageUrl: info.imageLinks.thumbnail || info.imageLinks.smallThumbnail,
-                category: 'General',
                 isbn: isbn,
                 JobId: job.id
             };
 
-            // Dynamic Category Handling
+            // Dynamic Subject Handling
             if (info.categories && info.categories.length > 0) {
-                const categoryName = info.categories[0];
-                const [categoryObj, created] = await Category.findOrCreate({
-                    where: { name: categoryName }
+                const subjectName = info.categories[0];
+                const [subjectObj] = await Subject.findOrCreate({
+                    where: { name: subjectName }
                 });
-                bookData.categoryId = categoryObj.id;
-                bookData.category = categoryName; // Keep legacy string field in sync
+                bookData.subjectIdsJson = [subjectObj.id];
             } else {
-                // Default to 'New Books' or 'General' if no category found? 
-                // Let's try to get 'New Books' if it exists from seed, otherwise General
-                const defaultCat = await Category.findOne({ where: { name: 'New Books' } });
-                if (defaultCat) {
-                    bookData.categoryId = defaultCat.id;
-                    bookData.category = 'New Books';
+                const defaultSub = await Subject.findOne({ where: { name: 'New Books' } });
+                if (defaultSub) {
+                    bookData.subjectIdsJson = [defaultSub.id];
                 }
             }
 
@@ -154,10 +149,14 @@ async function axiosWithRetry(url, config, retries = 5, delay = 5000) {
     try {
         return await axios.get(url, config);
     } catch (err) {
-        if (retries > 0 && err.response && err.response.status === 429) {
-            console.log(`[BookService] Rate limited (429). Retrying in ${delay}ms... (${retries} retries left)`);
-            await new Promise(r => setTimeout(r, delay));
-            return axiosWithRetry(url, config, retries - 1, delay * 2);
+        if (err.response && err.response.status === 429) {
+            if (retries > 0) {
+                console.log(`[BookService] Rate limited (429). Retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(r => setTimeout(r, delay));
+                return axiosWithRetry(url, config, retries - 1, delay * 2);
+            } else {
+                console.error(`[BookService] Rate limit (429) persists after multiple retries. API key likely required.`);
+            }
         }
         throw err;
     }
@@ -169,14 +168,18 @@ async function processDataRepairBackground(job) {
     let removedCount = job.removedCount || 0;
 
     try {
+        const apiKey = process.env.GOOGLE_API_KEY;
         console.log(`[BookService] [Background] Starting Refined Data Repair Job ${job.id} at ID: ${job.lastProcessedId || 'START'}`);
+        if (!apiKey) {
+            console.warn("[BookService] [Background] WARNING: GOOGLE_API_KEY is missing. Enrichment will be severely rate-limited.");
+        }
 
         const baseWhere = {
             isbn: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] }, // Only repair if we have an ISBN
             [Op.or]: [
                 { description: { [Op.or]: [null, '', 'No description available.'] } },
                 { author: { [Op.or]: [null, '', 'Unknown'] } },
-                { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }] } }
+                { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, { [Op.like]: '%default_cover.svg%' }] } }
             ]
         };
 
@@ -184,7 +187,8 @@ async function processDataRepairBackground(job) {
         console.log(`[BookService] Identified ${totalToFix.toLocaleString()} books with ISBNs needing repair.`);
 
         if (job.status !== 'paused') {
-            job.summary = `Identified ${totalToFix.toLocaleString()} books with ISBNs. Initializing prioritized repair...`;
+            const warning = !apiKey ? " (WARNING: No API Key)" : "";
+            job.summary = `Identified ${totalToFix.toLocaleString()} books with ISBNs.${warning} Initializing prioritized repair...`;
             await job.save();
         }
 
@@ -495,12 +499,12 @@ async function processBatch(rows, job, markup) {
     let added = 0;
     let updated = 0;
 
-    // 1. Pre-fetch Categories
-    const categoryNames = [...new Set(rows.map(r => r.category || 'New Books'))];
-    const categoryMap = {};
-    for (const name of categoryNames) {
-        const [cat] = await Category.findOrCreate({ where: { name } });
-        categoryMap[name] = cat.id;
+    // 1. Pre-fetch Subjects
+    const subjectNames = [...new Set(rows.map(r => r.category || 'New Books'))];
+    const subjectMap = {};
+    for (const name of subjectNames) {
+        const [sub] = await Subject.findOrCreate({ where: { name } });
+        subjectMap[name] = sub.id;
     }
 
     // 2. Pre-fetch Existing Books in this batch
@@ -517,10 +521,10 @@ async function processBatch(rows, job, markup) {
         attributes: ['id', 'isbn', 'title']
     });
 
-    const existingMap = {};
+    const existingMap = new Map();
     existingBooks.forEach(b => {
-        if (b.isbn) existingMap[`isbn:${b.isbn}`] = b.id;
-        existingMap[`title:${b.title}`] = b.id;
+        if (b.isbn) existingMap.set(`isbn:${b.isbn}`, b.id);
+        existingMap.set(`title:${b.title}`, b.id);
     });
 
     // 3. Process Batch in Transaction
@@ -528,6 +532,10 @@ async function processBatch(rows, job, markup) {
         for (const row of rows) {
             const title = row.title || row.heading || row.name || row.item || row.book;
             const isbn = row.isbn || row.code || row.id || row.barcode;
+            const status = (row.status || '').toLowerCase().trim();
+
+            // Strictly filter by 'ready' status as requested
+            if (status && status !== 'ready') continue;
             if (!title && !isbn) continue;
 
             const costVal = row.price_cost || row.cost || row.price;
@@ -541,17 +549,22 @@ async function processBatch(rows, job, markup) {
                 price: finalPrice || 19.99,
                 price_cost: cost,
                 imageUrl: row.imageurl || row.image || '/images/default_cover.svg',
-                category: row.category || 'New Books',
-                categoryId: categoryMap[row.category || 'New Books'],
+                subjectIdsJson: [subjectMap[row.category || 'New Books']],
                 isbn: isbn || null,
-                status: row.status || 'unknown',
+                status: status || 'ready', // Default to ready if we got this far
                 bind: row.bind || null,
                 pur: row.pur || row.bind || null,
-                isVisible: (row.status && row.status.toLowerCase() === 'ready'),
+                isVisible: true, // If it's ready, it's visible
                 JobId: job.id
             };
 
-            const existingId = (isbn && existingMap[`isbn:${isbn}`]) || existingMap[`title:${title}`];
+            // Deduplication Strategy: ISBN priority, Title fallback
+            let existingId = null;
+            if (isbn) {
+                existingId = existingMap.get(`isbn:${isbn}`);
+            } else if (title) {
+                existingId = existingMap.get(`title:${title}`);
+            }
 
             if (!existingId) {
                 await Book.create(bookData, { transaction: t });
@@ -706,7 +719,7 @@ async function runUltimateRepair(job) {
                 [Op.or]: [
                     { description: { [Op.or]: [null, '', 'No description available.'] } },
                     { author: { [Op.or]: [null, '', 'Unknown'] } },
-                    { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, '/images/default_cover.svg'] } }
+                    { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, { [Op.like]: '%default_cover.svg%' }] } }
                 ]
             }
         });
@@ -721,7 +734,7 @@ async function runUltimateRepair(job) {
                 [Op.or]: [
                     { description: { [Op.or]: [null, '', 'No description available.'] } },
                     { author: { [Op.or]: [null, '', 'Unknown'] } },
-                    { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, '/images/default_cover.svg'] } }
+                    { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, { [Op.like]: '%default_cover.svg%' }] } }
                 ]
             },
             attributes: ['id', 'isbn', 'description', 'author', 'imageUrl'],
@@ -1021,10 +1034,21 @@ async function processBatchUpdates(updates) {
     let count = 0;
     const subjectsToEnsure = new Set();
 
-    // 1. Collect all subjects across the batch for pre-creation
+    // 1. Collect and clean all subjects across the batch for pre-creation
     for (const item of updates) {
         if (item.subjects) {
-            item.subjects.forEach(s => subjectsToEnsure.add(s));
+            const cleanedSubjects = [];
+            item.subjects.forEach(s => {
+                if (!s) return;
+                // Open Library often packs multiple subjects into one semicolon-delimited string
+                const parts = s.split(';').map(p => p.trim()).filter(Boolean);
+                parts.forEach(p => {
+                    const truncated = p.substring(0, 255);
+                    subjectsToEnsure.add(truncated);
+                    cleanedSubjects.push(truncated);
+                });
+            });
+            item.subjects = cleanedSubjects; // Re-assign cleaned list for step 3
         }
     }
 
@@ -1041,6 +1065,12 @@ async function processBatchUpdates(updates) {
     await sequelize.transaction(async (t) => {
         for (const item of updates) {
             const { id, subjects, ...bookData } = item;
+
+            // Defensive Truncation for metadata
+            if (bookData.title) bookData.title = bookData.title.substring(0, 255);
+            if (bookData.author) bookData.author = bookData.author.substring(0, 255);
+            if (bookData.imageUrl) bookData.imageUrl = bookData.imageUrl.substring(0, 255);
+            if (bookData.description) bookData.description = bookData.description.substring(0, 4000);
 
             // Update Book fields (Title, Author, Desc etc)
             if (Object.keys(bookData).length > 0) {

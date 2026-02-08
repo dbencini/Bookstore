@@ -1,0 +1,13 @@
+CREATE TABLE `book_category` (
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `BookId` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `CategoryId` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `BookCategories_CategoryId_BookId_unique` (`BookId`,`CategoryId`),
+  UNIQUE KEY `book_categories__book_id__category_id` (`BookId`,`CategoryId`),
+  KEY `CategoryId` (`CategoryId`),
+  CONSTRAINT `book_category_ibfk_1` FOREIGN KEY (`BookId`) REFERENCES `books` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `book_category_ibfk_2` FOREIGN KEY (`CategoryId`) REFERENCES `category` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci

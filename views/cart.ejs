@@ -29,12 +29,12 @@
                                         <td>
                                             <%= item.Book.title %>
                                         </td>
-                                        <td>R<%= item.Book.price %>
+                                        <td>R<%= parseFloat(item.Book.price).toFixed(2) %>
                                         </td>
                                         <td>
                                             <%= item.quantity %>
                                         </td>
-                                        <td>R<%= (item.quantity * item.Book.price).toFixed(2) %>
+                                        <td>R<%= (item.quantity * parseFloat(item.Book.price)).toFixed(2) %>
                                         </td>
                                         <td>
                                             <form action="/cart/remove" method="POST">
@@ -48,7 +48,7 @@
                             <tfoot>
                                 <tr>
                                     <td colspan="3" class="text-end"><strong>Total:</strong></td>
-                                    <td><strong>R<%= total.toFixed(2) %></strong></td>
+                                    <td><strong>R<%= parseFloat(total).toFixed(2) %></strong></td>
                                     <td></td>
                                 </tr>
                             </tfoot>

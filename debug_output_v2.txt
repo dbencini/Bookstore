@@ -1,0 +1,11 @@
+Query: SELECT rowid FROM OrderNotes LIMIT 1 OFFSET 4
+Result length: 1
+Result[0]: {"id":5}
+Keys in Result[0]: id
+Result[0].rowid: undefined
+
+Query: SELECT rowid, * FROM OrderNotes LIMIT 1
+Result length: 1
+Result[0]: {"id":1,"content":"Test note","isCustomerVisible":0,"createdAt":"2025-12-14 14:59:25.393 +00:00","updatedAt":"2025-12-14 14:59:25.393 +00:00","OrderId":"29f3c043-ad3d-42f0-941a-64905983346c","UserId":"cd383327-659a-4740-9df2-c9c4b7383b89"}
+Keys in Result[0]: id, content, isCustomerVisible, createdAt, updatedAt, OrderId, UserId
+Result[0].rowid: undefined

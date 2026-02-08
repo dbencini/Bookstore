@@ -36,9 +36,15 @@
                             value="<%= filters?.isbn || '' %>" placeholder="Contains...">
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Category (Text)</label>
-                        <input type="text" name="category" class="form-control form-control-sm"
-                            value="<%= filters?.category || '' %>" placeholder="Like...">
+                        <label class="form-label">Category</label>
+                        <select name="category" class="form-select form-select-sm">
+                            <option value="">All Categories</option>
+                            <% categories.forEach(cat=> { %>
+                                <option value="<%= cat.name %>" <%=filters?.category===cat.name ? 'selected' : '' %>>
+                                    <%= cat.name %>
+                                </option>
+                                <% }) %>
+                        </select>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Date Range</label>
@@ -114,7 +120,7 @@
                         <%= book.isbn || '-' %>
                     </td>
                     <td>
-                        R<%= book.price ? book.price.toFixed(2) : '0.00' %>
+                        R<%= book.price ? parseFloat(book.price).toFixed(2) : '0.00' %>
                     </td>
                     <td>
                         <% if (book.Categories && book.Categories.length> 0) { %>
@@ -171,13 +177,13 @@
                 <ul class="pagination justify-content-center mb-0">
                     <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
                         <a class="page-link"
-                            href="/admin/books?page=<%= currentPage - 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Previous</a>
+                            href="/admin/books?page=<%= currentPage - 1 %>&title=<%= encodeURIComponent(filters.title) %>&author=<%= encodeURIComponent(filters.author) %>&category=<%= encodeURIComponent(filters.category) %>&isbn=<%= encodeURIComponent(filters.isbn) %>&startDate=<%= encodeURIComponent(filters.startDate) %>&endDate=<%= encodeURIComponent(filters.endDate) %>">Previous</a>
                     </li>
                     <% let startPage=Math.max(1, currentPage - 2); let endPage=Math.min(totalPages, currentPage + 2); if
                         (startPage> 1) { %>
                         <li class="page-item">
                             <a class="page-link"
-                                href="/admin/books?page=1&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">1</a>
+                                href="/admin/books?page=1&title=<%= encodeURIComponent(filters.title) %>&author=<%= encodeURIComponent(filters.author) %>&category=<%= encodeURIComponent(filters.category) %>&isbn=<%= encodeURIComponent(filters.isbn) %>&startDate=<%= encodeURIComponent(filters.startDate) %>&endDate=<%= encodeURIComponent(filters.endDate) %>">1</a>
                         </li>
                         <% if (startPage> 2) { %>
                             <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -187,7 +193,7 @@
                                     <% for(let i=startPage; i <=endPage; i++) { %>
                                         <li class="page-item <%= currentPage === i ? 'active' : '' %>">
                                             <a class="page-link"
-                                                href="/admin/books?page=<%= i %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
+                                                href="/admin/books?page=<%= i %>&title=<%= encodeURIComponent(filters.title) %>&author=<%= encodeURIComponent(filters.author) %>&category=<%= encodeURIComponent(filters.category) %>&isbn=<%= encodeURIComponent(filters.isbn) %>&startDate=<%= encodeURIComponent(filters.startDate) %>&endDate=<%= encodeURIComponent(filters.endDate) %>">
                                                 <%= i %>
                                             </a>
                                         </li>
@@ -200,7 +206,7 @@
                                                     <% } %>
                                                         <li class="page-item">
                                                             <a class="page-link"
-                                                                href="/admin/books?page=<%= totalPages %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">
+                                                                href="/admin/books?page=<%= totalPages %>&title=<%= encodeURIComponent(filters.title) %>&author=<%= encodeURIComponent(filters.author) %>&category=<%= encodeURIComponent(filters.category) %>&isbn=<%= encodeURIComponent(filters.isbn) %>&startDate=<%= encodeURIComponent(filters.startDate) %>&endDate=<%= encodeURIComponent(filters.endDate) %>">
                                                                 <%= totalPages %>
                                                             </a>
                                                         </li>
@@ -208,7 +214,7 @@
                                                             <li
                                                                 class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
                                                                 <a class="page-link"
-                                                                    href="/admin/books?page=<%= currentPage + 1 %>&title=<%= filters.title %>&author=<%= filters.author %>&category=<%= filters.category %>&isbn=<%= filters.isbn %>&startDate=<%= filters.startDate %>&endDate=<%= filters.endDate %>">Next</a>
+                                                                    href="/admin/books?page=<%= currentPage + 1 %>&title=<%= encodeURIComponent(filters.title) %>&author=<%= encodeURIComponent(filters.author) %>&category=<%= encodeURIComponent(filters.category) %>&isbn=<%= encodeURIComponent(filters.isbn) %>&startDate=<%= encodeURIComponent(filters.startDate) %>&endDate=<%= encodeURIComponent(filters.endDate) %>">Next</a>
                                                             </li>
                 </ul>
             </nav>
@@ -266,20 +272,27 @@
                                             <div class="row">
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label fw-bold">Categories</label>
-                                                    <select name="categoryIds" id="modalBookCategory"
-                                                        class="form-select" multiple size="5">
+                                                    <div id="categoryCheckboxContainer"
+                                                        class="form-control overflow-auto bg-light"
+                                                        style="height: 120px; border: 1px solid #dee2e6;">
                                                         <% categories.forEach(cat=> { %>
-                                                            <option value="<%= cat.id %>">
-                                                                <%= cat.name %>
-                                                            </option>
+                                                            <div class="form-check ms-2">
+                                                                <input class="form-check-input category-checkbox"
+                                                                    type="checkbox" value="<%= cat.id %>"
+                                                                    id="cat-check-<%= cat.id %>">
+                                                                <label class="form-check-label"
+                                                                    for="cat-check-<%= cat.id %>">
+                                                                    <%= cat.name %>
+                                                                </label>
+                                                            </div>
                                                             <% }) %>
-                                                    </select>
-                                                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                                                    </div>
+                                                    <small class="text-muted">Select all that apply</small>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label fw-bold">Price (R)</label>
                                                     <input type="number" name="price" id="modalBookPrice"
-                                                        class="form-control" step="0.01" min="0">
+                                                        class="form-control" step="0.01" min="0" lang="en-ZA">
                                                 </div>
                                             </div>
                                             <div class="row">
@@ -376,9 +389,12 @@
                                 // Checkbox handling
                                 data.isVisible = document.getElementById('modalBookVisible').checked ? 'on' : 'off';
 
-                                // Multiple Select handling
-                                const categorySelect = document.getElementById('modalBookCategory');
-                                data.categoryIds = Array.from(categorySelect.selectedOptions).map(opt => opt.value);
+                                // Checkbox handling for Categories
+                                const selectedCats = [];
+                                document.querySelectorAll('.category-checkbox:checked').forEach(cb => {
+                                    selectedCats.push(cb.value);
+                                });
+                                data.categoryIds = selectedCats;
 
                                 try {
                                     const response = await fetch(updateForm.action, {
@@ -438,13 +454,14 @@
 
                                 document.getElementById('modalBookStock').value = ds.stock;
 
-                                // Handle Multiple Categories
-                                const categorySelect = document.getElementById('modalBookCategory');
+                                // Handle Multiple Categories (Checkboxes)
                                 const selectedCategoryIds = JSON.parse(ds.categories || '[]');
-                                Array.from(categorySelect.options).forEach(opt => {
-                                    opt.selected = selectedCategoryIds.includes(opt.value);
+                                document.querySelectorAll('.category-checkbox').forEach(cb => {
+                                    cb.checked = selectedCategoryIds.includes(cb.value);
                                 });
-                                document.getElementById('modalBookPrice').value = ds.price;
+                                // Ensure price uses period decimal separator (South African standard)
+                                const priceValue = parseFloat(ds.price);
+                                document.getElementById('modalBookPrice').value = isNaN(priceValue) ? '' : priceValue.toFixed(2);
                                 document.getElementById('modalBookImage').value = ds.image;
                                 document.getElementById('modalBookThumbnail').src = ds.image;
 

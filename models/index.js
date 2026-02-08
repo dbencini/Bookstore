@@ -1,3 +1,4 @@
+const { Sequelize, Op } = require('sequelize');
 const sequelize = require('../config/database');
 const UserType = require('./UserType');
 const User = require('./User');
@@ -5,6 +6,8 @@ const Book = require('./Book');
 const CartItem = require('./CartItem');
 const Order = require('./Order');
 const SiteConfig = require('./SiteConfig');
+const Subject = require('./Subject');
+const BookSubject = require('./BookSubject');
 const Category = require('./Category');
 const BookCategory = require('./BookCategory');
 const Job = require('./Job');
@@ -13,6 +16,7 @@ const FooterSetting = require('./FooterSetting');
 const OrderItem = require('./OrderItem');
 const Workshop = require('./Workshop');
 const OrderSource = require('./OrderSource');
+
 
 // CloudPrinter Models
 const CpOrder = require('./CpOrder');
@@ -93,6 +97,8 @@ module.exports = {
     CartItem,
     Order,
     SiteConfig,
+    Subject,
+    BookSubject,
     Category,
     BookCategory,
     Job,
@@ -105,5 +111,6 @@ module.exports = {
     CpOrderItem,
     CpAddress,
     CpFile,
-    CpSignal
+    CpSignal,
+    Op
 };

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Op } = require('sequelize');
-const { User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem, OrderSource, CpOrderItem, CpOrder, CpFile, CpAddress } = require('../models');
+const { sequelize, User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem, OrderSource, CpOrderItem, CpOrder, CpFile, CpAddress, Op } = require('../models');
 
 // Book Management
 
@@ -10,7 +9,7 @@ const { User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Wo
 // Book Management
 // Middleware Imports
 const requireAdmin = require('../middleware/adminAuth');
-const { fetchGoogleBooks, fixBookData, importBooksFromCSV, importManualZip, cancelJob } = require('../services/bookService');
+const { fetchGoogleBooks, fixBookData, importBooksFromCSV, importManualZip, stopJob, pauseJob, resumeJob } = require('../services/bookService');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
@@ -47,7 +46,7 @@ router.get('/workshop', async (req, res) => {
         }
 
         if (orderId) {
-            whereClause['$OrderItem.Order.id$'] = { [Op.like]: `%${orderId}%` };
+            whereClause['$OrderItem.Order.id$'] = { [Op.like]: `% ${orderId}% ` };
         }
 
         if (search) {
@@ -56,9 +55,9 @@ router.get('/workshop', async (req, res) => {
             whereClause[Op.and] = [
                 {
                     [Op.or]: [
-                        { '$OrderItem.Book.title$': { [Op.like]: `%${search}%` } },
-                        { '$OrderItem.Book.isbn$': { [Op.like]: `%${search}%` } },
-                        { '$OrderItem.Order.id$': { [Op.like]: `%${search}%` } }
+                        { '$OrderItem.Book.title$': { [Op.like]: `% ${search}% ` } },
+                        { '$OrderItem.Book.isbn$': { [Op.like]: `% ${search}% ` } },
+                        { '$OrderItem.Order.id$': { [Op.like]: `% ${search}% ` } }
                     ]
                 }
             ];
@@ -155,12 +154,12 @@ router.get('/users', async (req, res) => {
                 Sequelize.where(
                     Sequelize.fn('lower', Sequelize.col('User.name')),
                     'LIKE',
-                    `%${lowerSearch}%`
+                    `% ${lowerSearch}% `
                 ),
                 Sequelize.where(
                     Sequelize.fn('lower', Sequelize.col('User.email')),
                     'LIKE',
-                    `%${lowerSearch}%`
+                    `% ${lowerSearch}% `
                 )
             ];
         }
@@ -219,50 +218,116 @@ router.post('/users/:id/update', async (req, res) => {
 // Book Management
 router.get('/books', async (req, res) => {
     try {
-        const { page = 1, title, author, category, isbn, startDate, endDate } = req.query;
+        // Helper to sanitize incoming query strings (handles literal "undefined" from faulty links)
+        const sanitize = (val) => {
+            if (val === undefined || val === null || val === 'undefined' || val === 'null') return null;
+            return val.trim();
+        };
+
+        const title = sanitize(req.query.title);
+        const author = sanitize(req.query.author);
+        const category = sanitize(req.query.category);
+        const isbn = sanitize(req.query.isbn);
+        const startDate = sanitize(req.query.startDate);
+        const endDate = sanitize(req.query.endDate);
+        const page = parseInt(req.query.page) || 1;
+
         const limit = 12;
         const offset = (page - 1) * limit;
 
-        // Build Where Clause
         const where = {};
-        const include = [];
 
-        if (title) where.title = { [Op.like]: `%${title}%` };
-        if (title) where.title = { [Op.like]: `%${title}%` };
-        if (author) where.author = { [Op.like]: `%${author}%` };
-        if (isbn) where.isbn = { [Op.like]: `%${isbn}%` };
+        // Detect if any search filter is active
+        const isSearching = !!(title || author || category || isbn || startDate || endDate);
+        const isCategorySearch = !!category;
 
-        // Date Range Search
-        if (startDate || endDate) {
-            where.createdAt = {};
-            if (startDate) where.createdAt[Op.gte] = new Date(startDate);
-            if (endDate) {
-                // Set to end of day
-                const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
-                where.createdAt[Op.lte] = end;
+        if (isSearching) {
+            where.isVisible = true;
+            if (title) where.title = { [Op.like]: `%${title}%` };
+            if (author) where.author = { [Op.like]: `%${author}%` };
+            if (isbn) where.isbn = { [Op.like]: `%${isbn}%` };
+
+            // Date Range Search with validation
+            if (startDate || endDate) {
+                const dateFilter = {};
+                if (startDate) {
+                    const start = new Date(startDate);
+                    if (!isNaN(start.getTime())) {
+                        dateFilter[Op.gte] = start;
+                    }
+                }
+                if (endDate) {
+                    const end = new Date(endDate);
+                    if (!isNaN(end.getTime())) {
+                        end.setHours(23, 59, 59, 999);
+                        dateFilter[Op.lte] = end;
+                    }
+                }
+                if (Object.keys(dateFilter).length > 0) {
+                    where.createdAt = dateFilter;
+                }
+            }
+        } else {
+            // Initial View: Only show books that have images (excluding placeholders)
+            where.imageUrl = {
+                [Op.and]: [
+                    { [Op.ne]: null },
+                    { [Op.ne]: '' },
+                    { [Op.ne]: '/images/placeholder-book.png' },
+                    { [Op.ne]: 'https://placehold.co/200x300' },
+                    { [Op.ne]: '/images/default_cover.svg' }
+                ]
+            };
+        }
+
+        // Optimization: Only include Category in the main query if searching by it
+        // Join-based filtering on 5M rows is expensive, but necessary for specific category search.
+        if (isCategorySearch) {
+            const cat = await Category.findOne({ where: { name: category } });
+            if (cat) {
+                // Use join table for filtering
+                where.id = {
+                    [Op.in]: sequelize.literal(`(SELECT BookId FROM book_category WHERE CategoryId = '${cat.id}')`)
+                };
+            } else {
+                where.id = '00000000-0000-0000-0000-000000000000';
             }
         }
 
-        // Category Search (via Many-to-Many Association)
-        const categoryInclude = {
-            model: Category,
-            as: 'Categories' // Standard Sequelize plural
-        };
-        if (category) {
-            categoryInclude.where = { name: { [Op.like]: `%${category}%` } };
-        }
-        include.push(categoryInclude);
+        const count = await Book.count({ where });
 
-        const { count, rows } = await Book.findAndCountAll({
+        const rows = await Book.findAll({
             where,
-            include,
             limit,
             offset,
-            order: [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
+            order: [['updatedAt', 'DESC']]
         });
 
-        // Fetch categories for combobox in Edit modal (and potential filter dropdown if needed later)
+        if (rows.length > 0) {
+            const bookIds = rows.map(b => b.id);
+            const categoriesForBooks = await Category.findAll({
+                include: [{
+                    model: Book,
+                    where: { id: bookIds },
+                    attributes: ['id'],
+                    through: { attributes: [] }
+                }]
+            });
+
+            const categoryMap = {};
+            categoriesForBooks.forEach(cat => {
+                cat.Books.forEach(book => {
+                    if (!categoryMap[book.id]) categoryMap[book.id] = [];
+                    categoryMap[book.id].push(cat);
+                });
+            });
+
+            rows.forEach(book => {
+                book.Categories = categoryMap[book.id] || [];
+            });
+        }
+
+        // Fetch all categories for combobox in Edit modal
         const categories = await Category.findAll({ order: [['name', 'ASC']] });
         const totalPages = Math.ceil(count / limit);
 
@@ -273,7 +338,14 @@ router.get('/books', async (req, res) => {
             page: 'books',
             currentPage: parseInt(page),
             totalPages,
-            filters: { title, author, category, isbn, startDate, endDate }
+            filters: {
+                title: title || '',
+                author: author || '',
+                category: category || '',
+                isbn: isbn || '',
+                startDate: startDate || '',
+                endDate: endDate || ''
+            }
         });
     } catch (err) {
         console.error(err);
@@ -328,12 +400,22 @@ router.post('/books/:id/update', async (req, res) => {
             console.log('[DEBUG] Received Description:', description);
 
             if (req.body.categoryIds) {
-                // If its a single value from form, convert to array
                 const catIds = Array.isArray(req.body.categoryIds) ? req.body.categoryIds : [req.body.categoryIds];
-                await book.setCategories(catIds);
-            } else if (req.body.categoryId) {
-                // Compatibility with old single-select if needed
-                await book.setCategories([req.body.categoryId]);
+                // Since books are linked to categories VIA subjects, updating categories means
+                // we should associate the book with subjects that belong to those categories.
+                // For simplicity, we'll find any subjects that are in the selected categories.
+                const subjectsToLink = await Subject.findAll({
+                    include: [{
+                        model: Category,
+                        where: { id: { [Op.in]: catIds } }
+                    }]
+                });
+                if (subjectsToLink.length > 0) {
+                    const subIds = subjectsToLink.map(s => s.id);
+                    await book.setSubjects(subIds);
+                    // Sync the JSON field too
+                    book.subjectIdsJson = subIds;
+                }
             }
 
             if (price) book.price = parseFloat(price);
@@ -435,8 +517,8 @@ router.post('/jobs/fix-data', async (req, res) => {
 
 router.post('/jobs/:id/stop', async (req, res) => {
     try {
-        const result = cancelJob(req.params.id);
-        if (result) {
+        const result = await stopJob(req.params.id);
+        if (result.success) {
             // Wait briefly for the loop to break
             await new Promise(r => setTimeout(r, 600));
         }
@@ -606,15 +688,21 @@ router.post('/jobs/:id/stop', async (req, res) => {
     }
 });
 
+
 router.get('/repair/stats', async (req, res) => {
     try {
-        const [total, hasAuthor, hasDesc, hasThumb, hasCost, hasSale] = await Promise.all([
+        const [total, hasAuthor, hasDesc, hasThumb, hasCost, hasSale, categories] = await Promise.all([
             Book.count(),
             Book.count({ where: { author: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }, { [Op.ne]: 'Unknown' }] } } }),
             Book.count({ where: { description: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }, { [Op.ne]: 'No description available.' }] } } }),
             Book.count({ where: { imageUrl: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }, { [Op.ne]: '/images/placeholder-book.png' }, { [Op.ne]: 'https://placehold.co/200x300' }] } } }),
             Book.count({ where: { price_cost: { [Op.gt]: 0 } } }),
-            Book.count({ where: { price: { [Op.gt]: 0 } } })
+            Book.count({ where: { price: { [Op.gt]: 0 } } }),
+            // Fetch category counts
+            Category.findAll({
+                attributes: ['id', 'name', 'book_count'],
+                order: [['book_count', 'DESC']]
+            })
         ]);
 
         res.json({
@@ -629,7 +717,8 @@ router.get('/repair/stats', async (req, res) => {
                 missingAuthor: total - hasAuthor,
                 missingDesc: total - hasDesc,
                 missingThumb: total - hasThumb
-            }
+            },
+            categories: categories.map(c => ({ name: c.name, count: c.book_count || 0 }))
         });
     } catch (err) {
         console.error(err);
@@ -657,6 +746,39 @@ router.get('/repair/stats/examples', async (req, res) => {
             where,
             limit: 5,
             attributes: ['id', 'title', 'author', 'isbn', 'price', 'price_cost', 'imageUrl'],
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({ success: true, books });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.get('/repair/stats/category-examples', async (req, res) => {
+    try {
+        const { name } = req.query;
+        if (!name) {
+            return res.status(400).json({ success: false, error: 'Category name is required' });
+        }
+
+        // Find the category
+        const category = await Category.findOne({ where: { name } });
+        if (!category) {
+            return res.json({ success: true, books: [] });
+        }
+
+        // Find books in this category
+        const books = await Book.findAll({
+            attributes: ['id', 'title', 'author', 'isbn', 'price', 'price_cost', 'imageUrl', 'createdAt'],
+            include: [{
+                model: Category,
+                where: { id: category.id },
+                attributes: [],
+                through: { attributes: [] }
+            }],
+            limit: 10,
             order: [['createdAt', 'DESC']]
         });
 
@@ -849,23 +971,23 @@ router.post('/cloudprinter/download-file', async (req, res) => {
         const destPath = path.join(hotfolder, fileName);
 
         // Create a minimal valid PDF (1.7) so browsers don't complain
-        const pdfContent = `%PDF-1.7
+        const pdfContent = `% PDF - 1.7
 1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
+    << /Type /Catalog / Pages 2 0 R >>
+        endobj
 2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+    << /Type /Pages / Kids[3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+    << /Type /Page / Parent 2 0 R / MediaBox[0 0 612 792] /Contents 4 0 R >>
 endobj
 4 0 obj
-<< /Length 59 >>
+    << /Length 59 >>
 stream
 BT
-/F1 24 Tf
+    / F1 24 Tf
 50 700 Td
-(Dummy File: ${file.type} for Order No ${orderNo}) Tj
+    (Dummy File: ${file.type} for Order No ${orderNo}) Tj
 ET
 endstream
 endobj
@@ -877,10 +999,10 @@ xref
 0000000117 00000 n
 0000000216 00000 n
 trailer
-<< /Size 5 /Root 1 0 R >>
-startxref
+    << /Size 5 /Root 1 0 R >>
+        startxref
 325
-%%EOF`;
+    %% EOF`;
         fs.writeFileSync(destPath, Buffer.from(pdfContent));
 
         // Save local path
@@ -1007,7 +1129,7 @@ router.post('/workshop/update', async (req, res) => {
                     await order.save();
                     orderCompleted = true;
                     completedOrderId = orderId;
-                    console.log(`Order ${orderId} auto-marked as Shipped.`);
+                    console.log(`Order ${orderId} auto - marked as Shipped.`);
                 }
             }
         }
@@ -1049,7 +1171,7 @@ router.post('/orders/:id/note', async (req, res) => {
         });
 
         if (emailCustomer) {
-            console.log(`[CRM-EMAIL-STUB] Sending email to Customer of Order ${req.params.id}: "${content}"`);
+            console.log(`[CRM - EMAIL - STUB] Sending email to Customer of Order ${req.params.id}: "${content}"`);
             // In future: await emailService.send(...)
         }
 
@@ -1074,7 +1196,7 @@ router.get('/categories', async (req, res) => {
 
         const where = {};
         if (search) {
-            where.name = { [Op.like]: `%${search}%` };
+            where.name = { [Op.like]: `% ${search}% ` };
         }
 
         const { count, rows } = await Category.findAndCountAll({

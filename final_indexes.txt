@@ -1,0 +1,6 @@
+KEY:PRIMARY COL:id
+KEY:books_isbn COL:isbn
+KEY:JobId COL:JobId
+KEY:books_title COL:title
+KEY:books_image_url COL:imageUrl
+KEY:books_author COL:author

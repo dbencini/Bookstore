@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
-const Category = sequelize.define('Category', {
+const Subject = sequelize.define('Subject', {
     id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
@@ -11,18 +11,9 @@ const Category = sequelize.define('Category', {
         type: DataTypes.STRING,
         allowNull: false,
         unique: true
-    },
-    subject_triggers: {
-        type: DataTypes.STRING(1000),
-        allowNull: true
-    },
-    book_count: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0
     }
 }, {
-    tableName: 'category',
-    timestamps: true
+    tableName: 'subjects'
 });
 
-module.exports = Category;
+module.exports = Subject;

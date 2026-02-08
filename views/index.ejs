@@ -50,7 +50,7 @@
                 <!-- Previous Button -->
                 <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
                     <a class="page-link"
-                        href="/books?page=<%= currentPage - 1 %>&search=<%= search || '' %>&category=<%= category || '' %>"
+                        href="/books?page=<%= currentPage - 1 %>&search=<%= encodeURIComponent(locals.search || '') %>&category=<%= encodeURIComponent(locals.category || '') %>"
                         tabindex="-1">Previous</a>
                 </li>
 
@@ -59,7 +59,7 @@
                     (startPage> 1) { %>
                     <li class="page-item">
                         <a class="page-link"
-                            href="/books?page=1&search=<%= search || '' %>&category=<%= category || '' %>">1</a>
+                            href="/books?page=1&search=<%= encodeURIComponent(locals.search || '') %>&category=<%= encodeURIComponent(locals.category || '') %>">1</a>
                     </li>
                     <% if (startPage> 2) { %>
                         <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -69,7 +69,7 @@
                                 <% for(let i=startPage; i <=endPage; i++) { %>
                                     <li class="page-item <%= currentPage === i ? 'active' : '' %>">
                                         <a class="page-link"
-                                            href="/books?page=<%= i %>&search=<%= search || '' %>&category=<%= category || '' %>">
+                                            href="/books?page=<%= i %>&search=<%= encodeURIComponent(locals.search || '') %>&category=<%= encodeURIComponent(locals.category || '') %>">
                                             <%= i %>
                                         </a>
                                     </li>
@@ -81,7 +81,7 @@
                                                 <% } %>
                                                     <li class="page-item">
                                                         <a class="page-link"
-                                                            href="/books?page=<%= totalPages %>&search=<%= search || '' %>&category=<%= category || '' %>">
+                                                            href="/books?page=<%= totalPages %>&search=<%= encodeURIComponent(locals.search || '') %>&category=<%= encodeURIComponent(locals.category || '') %>">
                                                             <%= totalPages %>
                                                         </a>
                                                     </li>
@@ -91,7 +91,7 @@
                                                         <li
                                                             class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
                                                             <a class="page-link"
-                                                                href="/books?page=<%= currentPage + 1 %>&search=<%= search || '' %>&category=<%= category || '' %>">Next</a>
+                                                                href="/books?page=<%= currentPage + 1 %>&search=<%= encodeURIComponent(locals.search || '') %>&category=<%= encodeURIComponent(locals.category || '') %>">Next</a>
                                                         </li>
             </ul>
         </nav>

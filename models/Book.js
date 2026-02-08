@@ -34,14 +34,6 @@ const Book = sequelize.define('Book', {
         type: DataTypes.INTEGER,
         defaultValue: 10
     },
-    category: {
-        type: DataTypes.STRING,
-        defaultValue: 'General'
-    },
-    categoryId: {
-        type: DataTypes.UUID,
-        allowNull: true
-    },
     JobId: {
         type: DataTypes.UUID,
         allowNull: true
@@ -65,11 +57,27 @@ const Book = sequelize.define('Book', {
     pur: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    import_comment: {
+        type: DataTypes.STRING(4000),
+        allowNull: true
+    },
+    subjectIdsJson: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: []
     }
 }, {
     indexes: [
         { unique: true, fields: ['isbn'] },
-        { fields: ['title'] }
+        { fields: ['title'] },
+        { fields: ['author'] },
+        { fields: ['imageUrl'] },
+        { fields: ['isVisible'] },
+        { fields: ['createdAt'] },
+        { fields: ['updatedAt'] },
+        { fields: ['isVisible', 'createdAt'] },
+        { fields: ['isVisible', 'updatedAt'] }
     ]
 });
 

@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
-const BookCategory = sequelize.define('BookCategory', {
+const BookSubject = sequelize.define('BookSubject', {
     id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
@@ -11,19 +11,19 @@ const BookCategory = sequelize.define('BookCategory', {
         type: DataTypes.UUID,
         allowNull: false
     },
-    CategoryId: {
+    SubjectId: {
         type: DataTypes.UUID,
         allowNull: false
     }
 }, {
-    tableName: 'book_category',
+    tableName: 'book_subjects',
     timestamps: true,
     indexes: [
         {
             unique: true,
-            fields: ['BookId', 'CategoryId']
+            fields: ['BookId', 'SubjectId']
         }
     ]
 });
 
-module.exports = BookCategory;
+module.exports = BookSubject;

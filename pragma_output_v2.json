@@ -1,0 +1,118 @@
+{
+  "OrderNotes": [
+    {
+      "cid": 0,
+      "name": "id",
+      "type": "INTEGER",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 1
+    },
+    {
+      "cid": 1,
+      "name": "content",
+      "type": "TEXT",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 2,
+      "name": "isCustomerVisible",
+      "type": "TINYINT(1)",
+      "notnull": 0,
+      "dflt_value": "0",
+      "pk": 0
+    },
+    {
+      "cid": 3,
+      "name": "createdAt",
+      "type": "DATETIME",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 4,
+      "name": "updatedAt",
+      "type": "DATETIME",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 5,
+      "name": "OrderId",
+      "type": "UUID",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 6,
+      "name": "UserId",
+      "type": "UUID",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    }
+  ],
+  "Orders": [
+    {
+      "cid": 0,
+      "name": "id",
+      "type": "UUID",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 1
+    },
+    {
+      "cid": 1,
+      "name": "total",
+      "type": "DECIMAL(10,2)",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 2,
+      "name": "status",
+      "type": "VARCHAR(255)",
+      "notnull": 0,
+      "dflt_value": "'pending'",
+      "pk": 0
+    },
+    {
+      "cid": 3,
+      "name": "createdAt",
+      "type": "DATETIME",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 4,
+      "name": "updatedAt",
+      "type": "DATETIME",
+      "notnull": 1,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 5,
+      "name": "UserId",
+      "type": "UUID",
+      "notnull": 0,
+      "dflt_value": null,
+      "pk": 0
+    },
+    {
+      "cid": 6,
+      "name": "fulfillmentStatus",
+      "type": "VARCHAR(255)",
+      "notnull": 0,
+      "dflt_value": "'unfulfilled'",
+      "pk": 0
+    }
+  ]
+}
