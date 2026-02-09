@@ -7,7 +7,7 @@ const path = require('path');
 const homepageCache = new Map();
 const HOMEPAGE_CACHE_TTL = 1000 * 60 * 10;
 
-// Global Count Cache (Module Scope)
+// Global Count Cache
 let globalBookCount = null;
 let lastCountFetch = 0;
 const GLOBAL_COUNT_TTL = 1000 * 60 * 60; // 1 hour
@@ -22,10 +22,69 @@ const getGlobalCount = async () => {
         lastCountFetch = Date.now();
         return globalBookCount;
     } catch (err) {
-        console.error('Failed to fetch global count:', err);
         return globalBookCount || 0;
     }
 };
+
+/**
+ * HIGH-PERFORMANCE SEARCH ENGINE
+ * Optimized for 4.9M records in MySQL.
+ * Rules:
+ * - No Date Sorting (Relevance is faster and better)
+ * - Capped Counting (Calculating total pages for millions of matches is slow)
+ * - Stopword pruning (Required to prevent 0-result bug)
+ */
+async function performSearch(search, limit, offset) {
+    const cleanSearch = search.trim();
+
+    // 1. ISBN Exact Match
+    const isIsbn = /^[0-9xX-\s]{10,13}$/.test(cleanSearch) && cleanSearch.replace(/[-\s]/g, '').match(/^\d{9,13}[\dXx]$/);
+    if (isIsbn) {
+        const cleanIsbn = cleanSearch.replace(/[-\s]/g, '');
+        const books = await Book.findAll({ where: { isbn: cleanIsbn, isVisible: true }, limit, offset });
+        return { books, count: books.length > 0 ? 1 : 0 };
+    }
+
+    // 2. Build Terms (Skip <3 chars and standard articles/prepositions for mandatory +)
+    // Standard stopword list provided by MySQL.
+    const stopwords = new Set(['the', 'and', 'for', 'with', 'about', 'from', 'that', 'this', 'was', 'are', 'not', 'but']);
+    const rawTerms = cleanSearch.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(t => t.length > 0);
+
+    const query = rawTerms.map(t => {
+        const lower = t.toLowerCase();
+        // Only make terms mandatory if they are likely significant
+        if (lower.length < 3 || stopwords.has(lower)) return `${t}*`;
+        return `+${t}*`;
+    }).join(' ');
+
+    if (!query) return { books: [], count: 0 };
+
+    // 3. Selective Fetch (No Order By = Lightning Fast)
+    const books = await sequelize.query(`
+        SELECT * FROM books 
+        WHERE isVisible = true 
+        AND MATCH(title, author) AGAINST(:search IN BOOLEAN MODE)
+        LIMIT :limit OFFSET :offset
+    `, {
+        replacements: { search: query, limit, offset },
+        type: sequelize.QueryTypes.SELECT,
+        model: Book,
+        mapToModel: true
+    });
+
+    // 4. Capped Count (Calculate up to 80 results/10 pages maximum for speed)
+    // This prevents the "81-second hang" on broad searches.
+    const [countRes] = await sequelize.query(`
+        SELECT COUNT(*) as count FROM (
+            SELECT id FROM books 
+            WHERE isVisible = true 
+            AND MATCH(title, author) AGAINST(:search IN BOOLEAN MODE)
+            LIMIT 80
+        ) as sub
+    `, { replacements: { search: query }, type: sequelize.QueryTypes.SELECT });
+
+    return { books, count: countRes ? countRes.count : 0 };
+}
 
 router.get('/books', async (req, res) => {
     const { search, category } = req.query;
@@ -33,65 +92,9 @@ router.get('/books', async (req, res) => {
     const limit = 8;
     const offset = (page - 1) * limit;
 
-    // Base WhereClause: Always visible, always have valid authors and descriptions
-    const whereClause = {
-        isVisible: true,
-        author: {
-            [Op.and]: [
-                { [Op.ne]: null },
-                { [Op.ne]: '' },
-                { [Op.ne]: 'Unknown' }
-            ]
-        },
-        description: {
-            [Op.and]: [
-                { [Op.ne]: null },
-                { [Op.ne]: '' },
-                { [Op.ne]: 'No description available.' }
-            ]
-        }
-    };
-    const isSearching = !!(search || category);
-
-    if (isSearching) {
-        if (search) {
-            whereClause[Op.or] = [
-                { title: { [Op.like]: `%${search}%` } },
-                { author: { [Op.like]: `%${search}%` } },
-                { isbn: { [Op.like]: `%${search}%` } }
-            ];
-        }
-    } else {
-        whereClause.imageUrl = {
-            [Op.and]: [
-                { [Op.ne]: null },
-                { [Op.ne]: '' },
-                { [Op.ne]: '/images/placeholder-book.png' },
-                { [Op.ne]: 'https://placehold.co/200x300' },
-                { [Op.ne]: '/images/default_cover.svg' }
-            ]
-        };
-    }
-
-    let categoryFilter = null;
     let categoryData = null;
-    if (category) {
-        // Find category and its associated books via join table
-        categoryData = await Category.findOne({ where: { name: category } });
-        if (categoryData) {
-            categoryFilter = {
-                model: Category,
-                where: { id: categoryData.id },
-                through: { attributes: [] },
-                required: true
-            };
-        } else {
-            // Category not found, return nothing
-            whereClause.id = '00000000-0000-0000-0000-000000000000';
-        }
-    }
+    if (category) categoryData = await Category.findOne({ where: { name: category } });
 
-    // Caching Strategy: Cache the default view AND specific categories (Page 1)
     const cacheKey = category ? `cat_${category.replace(/\W/g, '_')}_p${page}` : `homepage_p${page}`;
     if (homepageCache.has(cacheKey) && !search) {
         const cached = homepageCache.get(cacheKey);
@@ -101,99 +104,50 @@ router.get('/books', async (req, res) => {
     }
 
     try {
-        let count, books;
-
+        let count = 0, books = [];
         if (!search) {
-            // High-performance path: Use Index Hint + Count Caching
             if (categoryData) {
                 count = categoryData.book_count;
                 books = await sequelize.query(`
-                    SELECT * FROM books USE INDEX (books_is_visible_created_at)
-                    WHERE isVisible = true 
-                    AND author IS NOT NULL 
-                    AND author != '' 
-                    AND author != 'Unknown'
-                    AND description IS NOT NULL
-                    AND description != ''
-                    AND description != 'No description available.'
-                    AND id IN (SELECT BookId FROM book_category WHERE CategoryId = :categoryId) 
-                    ORDER BY createdAt DESC 
-                    LIMIT :limit OFFSET :offset
+                    SELECT b.* FROM books b USE INDEX (books_is_visible_created_at)
+                    STRAIGHT_JOIN book_category bc ON b.id = bc.BookId
+                    WHERE bc.CategoryId = :categoryId AND b.isVisible = true 
+                    ORDER BY b.createdAt DESC LIMIT :limit OFFSET :offset
                 `, {
                     replacements: { categoryId: categoryData.id, limit, offset },
-                    type: sequelize.QueryTypes.SELECT,
-                    model: Book,
-                    mapToModel: true
+                    type: sequelize.QueryTypes.SELECT, model: Book, mapToModel: true
                 });
             } else {
-                // Global view: Use cached count + Index Hint
                 count = await getGlobalCount();
                 books = await sequelize.query(`
                     SELECT * FROM books USE INDEX (books_is_visible_created_at)
-                    WHERE isVisible = true 
-                    AND author IS NOT NULL 
-                    AND author != '' 
-                    AND author != 'Unknown'
-                    AND description IS NOT NULL
-                    AND description != ''
-                    AND description != 'No description available.'
-                    ORDER BY createdAt DESC 
-                    LIMIT :limit OFFSET :offset
+                    WHERE isVisible = true ORDER BY createdAt DESC LIMIT :limit OFFSET :offset
                 `, {
                     replacements: { limit, offset },
-                    type: sequelize.QueryTypes.SELECT,
-                    model: Book,
-                    mapToModel: true
+                    type: sequelize.QueryTypes.SELECT, model: Book, mapToModel: true
                 });
             }
         } else {
-            // Text Search path (less frequent, relies on search indexes)
-            const queryOptions = {
-                where: whereClause,
-                limit,
-                offset,
-                order: [['createdAt', 'DESC']],
-                subQuery: false
-            };
-            if (categoryFilter) queryOptions.include = [categoryFilter];
-
-            const result = await Book.findAndCountAll(queryOptions);
-            count = result.count;
-            books = result.rows;
+            const results = await performSearch(search, limit, offset);
+            books = results.books;
+            count = results.count;
         }
 
-        const data = {
-            books,
-            currentPage: page,
-            totalPages: Math.ceil(count / limit)
-        };
-
-        // Save to cache if no text search
-        if (!search) {
-            homepageCache.set(cacheKey, { timestamp: Date.now(), data });
-        }
-
-        res.render('index', {
-            ...data,
-            search,
-            category
-        });
+        const data = { books, currentPage: page, totalPages: Math.ceil(count / limit) };
+        if (!search) homepageCache.set(cacheKey, { timestamp: Date.now(), data });
+        res.render('index', { ...data, search, category });
     } catch (err) {
-        console.error('[CRITICAL Index Error]', err.stack || err);
-        res.status(500).send('Server Error: ' + err.message);
+        res.status(500).send('Server Error');
     }
 });
 
 router.get('/books/:id', async (req, res, next) => {
-    // Basic check to prevent "books" being caught as an ID
     if (req.params.id === 'books') return next();
-
     try {
         const book = await Book.findByPk(req.params.id);
         if (!book) return res.status(404).send('Book not found');
         res.render('product-detail', { book });
     } catch (err) {
-        console.error(err);
         res.status(500).send('Server Error');
     }
 });
@@ -219,7 +173,6 @@ router.post('/profile', ensureAuthenticated, async (req, res) => {
         await user.save();
         res.render('profile', { user, countries, success: 'Updated' });
     } catch (err) {
-        console.error(err);
         res.render('profile', { user: req.user, countries, error: 'Failed' });
     }
 });

@@ -12,7 +12,7 @@ const Book = sequelize.define('Book', {
         allowNull: false
     },
     author: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(2000),
         allowNull: false
     },
     isbn: {
@@ -61,11 +61,6 @@ const Book = sequelize.define('Book', {
     import_comment: {
         type: DataTypes.STRING(4000),
         allowNull: true
-    },
-    subjectIdsJson: {
-        type: DataTypes.JSON,
-        allowNull: true,
-        defaultValue: []
     }
 }, {
     indexes: [
@@ -76,6 +71,7 @@ const Book = sequelize.define('Book', {
         { fields: ['isVisible'] },
         { fields: ['createdAt'] },
         { fields: ['updatedAt'] },
+        { type: 'FULLTEXT', name: 'idx_title_author_fulltext', fields: ['title', 'author'] },
         { fields: ['isVisible', 'createdAt'] },
         { fields: ['isVisible', 'updatedAt'] }
     ]

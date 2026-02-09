@@ -1,11 +1,16 @@
-const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./database.sqlite'); // Assuming default sqlite filename
+require('dotenv').config();
+const { sequelize } = require('./models');
 
-db.serialize(() => {
-    db.each("PRAGMA table_info(cp_files)", (err, row) => {
-        if (err) console.error(err);
-        console.log(row);
-    });
-});
+async function checkSchema() {
+    try {
+        await sequelize.authenticate();
+        const info = await sequelize.getQueryInterface().describeTable('Books');
+        console.log('Author Column Info:', JSON.stringify(info.author, null, 2));
+        process.exit(0);
+    } catch (err) {
+        console.error('Failed to describe table:', err);
+        process.exit(1);
+    }
+}
 
-db.close();
+checkSchema();

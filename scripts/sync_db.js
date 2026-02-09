@@ -1,4 +1,4 @@
-const { sequelize, Category, CategorySubject } = require('../models');
+const { sequelize, Category } = require('../models');
 
 async function sync() {
     try {

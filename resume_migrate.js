@@ -1,4 +1,5 @@
-const { sequelize, Book, Subject, BookSubject, Job, Op } = require('./models');
+require('dotenv').config();
+const { sequelize, Book, Category, BookCategory, Job, Op } = require('./models');
 const fs = require('fs');
 const csv = require('csv-parser');
 const path = require('path');
@@ -79,10 +80,10 @@ async function runImportPhase(progress) {
     let batch = [];
     const seenTitles = new Set();
 
-    // Warm up Subject Cache
-    const existingSubs = await Subject.findAll();
-    const subjectMap = {};
-    existingSubs.forEach(s => subjectMap[s.name] = s.id);
+    // Warm up Category Cache
+    const existingCats = await Category.findAll();
+    const categoryMap = {};
+    existingCats.forEach(c => categoryMap[c.name] = c.id);
 
     const stream = fs.createReadStream(CSV_PATH).pipe(csv({
         mapHeaders: ({ header }) => header.replace(/^[^\w]+/, '').toLowerCase().trim()
@@ -109,33 +110,55 @@ async function runImportPhase(progress) {
         }
         seenTitles.add(title);
 
-        const subName = row.category || 'New Books';
-        if (!subjectMap[subName]) {
-            const [newSub] = await Subject.findOrCreate({ where: { name: subName } });
-            subjectMap[subName] = newSub.id;
+        const categoryName = row.category || 'New Books';
+        if (!categoryMap[categoryName]) {
+            const [newCat] = await Category.findOrCreate({ where: { name: categoryName } });
+            categoryMap[categoryName] = newCat.id;
         }
 
         const cost = parseFloat(row.price_cost || row.cost || row.price) || 0;
 
         batch.push({
-            title: title || 'Unknown Title',
-            author: row.author || 'Unknown',
-            description: row.description || 'No description available.',
+            title: (title || 'Unknown Title').substring(0, 255),
+            author: (row.author || 'Unknown').substring(0, 2000),
+            description: (row.description || 'No description available.').substring(0, 4000),
             price: cost || 19.99,
             price_cost: cost,
-            imageUrl: row.imageurl || '/images/default_cover.svg',
+            imageUrl: (row.imageurl || '/images/default_cover.svg').substring(0, 255),
             isbn: isbn || null,
             status: 'ready',
             bind: bind || null,
             isVisible: true,
             import_comment: importComment,
-            subjectIdsJson: [subjectMap[subName]],
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            _categoryName: categoryName // Temporary field for linking
         });
 
         if (batch.length >= BATCH_SIZE) {
             await Book.bulkCreate(batch, { ignoreDuplicates: true });
+
+            const titlesInBatch = batch.map(b => b.title);
+            const booksInDb = await Book.findAll({
+                where: { title: { [Op.in]: titlesInBatch } },
+                attributes: ['id', 'title']
+            });
+
+            const linkBatch = [];
+            booksInDb.forEach(book => {
+                const batchReq = batch.find(b => b.title === book.title);
+                if (batchReq) {
+                    const catId = categoryMap[batchReq._categoryName];
+                    if (catId) {
+                        linkBatch.push({ BookId: book.id, CategoryId: catId });
+                    }
+                }
+            });
+
+            if (linkBatch.length > 0) {
+                await BookCategory.bulkCreate(linkBatch, { ignoreDuplicates: true });
+            }
+
             processedInPhase += batch.length;
             batch = [];
             progress.csvRow = rowCount;
@@ -148,6 +171,27 @@ async function runImportPhase(progress) {
 
     if (batch.length > 0) {
         await Book.bulkCreate(batch, { ignoreDuplicates: true });
+
+        const titlesInBatch = batch.map(b => b.title);
+        const booksInDb = await Book.findAll({
+            where: { title: { [Op.in]: titlesInBatch } },
+            attributes: ['id', 'title']
+        });
+
+        const linkBatch = [];
+        booksInDb.forEach(book => {
+            const batchReq = batch.find(b => b.title === book.title);
+            if (batchReq) {
+                const catId = categoryMap[batchReq._categoryName];
+                if (catId) {
+                    linkBatch.push({ BookId: book.id, CategoryId: catId });
+                }
+            }
+        });
+
+        if (linkBatch.length > 0) {
+            await BookCategory.bulkCreate(linkBatch, { ignoreDuplicates: true });
+        }
         processedInPhase += batch.length;
     }
     saveProgress(progress);
@@ -169,12 +213,8 @@ async function runRepairPhase(progress) {
     console.log('[Phase 2] Indexing books that need Author/Desc/Image repair...');
     const booksToFix = await Book.findAll({
         where: {
-            isbn: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] },
-            [Op.or]: [
-                { author: { [Op.or]: [null, '', 'Unknown'] } },
-                { description: { [Op.or]: [null, '', 'No description available.'] } },
-                { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, { [Op.like]: '%default_cover.svg%' }] } }
-            ]
+            isbn: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] }
+            // Aggressive mode: We include ALL books with ISBNs to allow for refreshing metadata/images
         },
         attributes: ['id', 'isbn', 'author', 'description', 'imageUrl'],
         raw: true
@@ -193,7 +233,7 @@ async function runRepairPhase(progress) {
             isbn: clean,
             needsAuthor: !b.author || b.author === 'Unknown',
             needsDesc: !b.description || b.description === 'No description available.',
-            needsImage: !b.imageUrl || b.imageUrl.includes('default_cover.svg') || b.imageUrl.includes('placehold.co')
+            currentImage: b.imageUrl
         });
     });
 
@@ -245,19 +285,18 @@ async function runRepairPhase(progress) {
                     updateData.description = typeof data.description === 'string' ? data.description : data.description.value;
                     updated = true;
                 }
-                if (match.needsImage) {
-                    let img = null;
-                    if (data.covers && data.covers[0] > 0) img = `https://covers.openlibrary.org/b/id/${data.covers[0]}-L.jpg`;
-                    else img = `https://covers.openlibrary.org/b/isbn/${match.isbn}-L.jpg`;
+                // Aggressive Image Update: If dump has a cover, we take it if it's new
+                let dumpImg = null;
+                if (data.covers && data.covers[0] > 0) dumpImg = `https://covers.openlibrary.org/b/id/${data.covers[0]}-L.jpg`;
+                else dumpImg = `https://covers.openlibrary.org/b/isbn/${match.isbn}-L.jpg`;
 
-                    if (img) {
-                        updateData.imageUrl = img;
-                        updated = true;
-                    }
+                if (dumpImg && dumpImg !== match.currentImage) {
+                    updateData.imageUrl = dumpImg;
+                    updated = true;
                 }
 
-                if (data.subjects) {
-                    updateData.subjects = data.subjects.slice(0, 5);
+                if (data.subjects && data.subjects.length > 0) {
+                    updateData.mappedCategories = data.subjects.slice(0, 10);
                     updated = true;
                 }
 
@@ -299,38 +338,56 @@ async function runRepairPhase(progress) {
 }
 
 async function processBatchUpdates(updates) {
-    const subjectsToEnsure = new Set();
-    for (const item of updates) {
-        if (item.subjects) {
-            item.subjects.forEach(s => {
-                const parts = s.split(';').map(p => p.trim().substring(0, 255)).filter(Boolean);
-                parts.forEach(p => subjectsToEnsure.add(p));
-            });
-        }
-    }
+    // 1. Load Curated Categories & Triggers
+    const curatedCategories = await Category.findAll({
+        where: { subject_triggers: { [Op.ne]: null } }
+    });
 
-    const subjectMap = {};
-    for (const name of subjectsToEnsure) {
-        const [sub] = await Subject.findOrCreate({ where: { name } });
-        subjectMap[name] = sub.id;
-    }
+    // Fallback: Ensure we have "New Books"
+    let [defaultCat] = await Category.findOrCreate({ where: { name: 'New Books' } });
 
     await sequelize.transaction(async (t) => {
         for (const item of updates) {
-            const { id, subjects, ...bookData } = item;
+            const { id, mappedCategories, ...bookData } = item;
             if (bookData.title) bookData.title = bookData.title.substring(0, 255);
-            if (bookData.author) bookData.author = bookData.author.substring(0, 255);
-            if (bookData.imageUrl) bookData.imageUrl = bookData.imageUrl.substring(0, 255);
-            if (bookData.description) bookData.description = bookData.description.substring(0, 4000);
+            if (bookData.author) bookData.author = (bookData.author || '').substring(0, 2000);
+            if (bookData.imageUrl) bookData.imageUrl = (bookData.imageUrl || '').substring(0, 255);
+            if (bookData.description) bookData.description = (bookData.description || '').substring(0, 4000);
+
+            // Enforce visibility
+            const hasDescription = bookData.description && bookData.description.trim() !== '' && bookData.description !== 'No description available.';
+            const hasAuthor = bookData.author && bookData.author !== 'Unknown' && bookData.author.trim() !== '';
+
+            if (hasDescription && hasAuthor) {
+                bookData.isVisible = true;
+            } else {
+                bookData.isVisible = false;
+            }
 
             await Book.update(bookData, { where: { id }, transaction: t });
 
-            if (subjects && subjects.length > 0) {
-                const subjectIds = subjects.map(s => subjectMap[s.split(';')[0].trim().substring(0, 255)]).filter(Boolean);
-                if (subjectIds.length > 0) {
-                    await Book.update({ subjectIdsJson: subjectIds }, { where: { id }, transaction: t });
-                    const mappings = subjectIds.map(subId => ({ BookId: id, SubjectId: subId }));
-                    await BookSubject.bulkCreate(mappings, { transaction: t, ignoreDuplicates: true });
+            if (mappedCategories && mappedCategories.length > 0) {
+                const categoryIds = new Set();
+
+                // Map each subject string to our curated triggers
+                for (const subject of mappedCategories) {
+                    const cleanSubject = subject.toLowerCase();
+                    for (const cat of curatedCategories) {
+                        const triggers = cat.subject_triggers.split(',').map(tr => tr.trim().toLowerCase());
+                        if (triggers.some(tr => cleanSubject.includes(tr))) {
+                            categoryIds.add(cat.id);
+                        }
+                    }
+                }
+
+                // If no trigger matches, use "New Books"
+                if (categoryIds.size === 0) {
+                    categoryIds.add(defaultCat.id);
+                }
+
+                if (categoryIds.size > 0) {
+                    const mappings = [...categoryIds].map(catId => ({ BookId: id, CategoryId: catId }));
+                    await BookCategory.bulkCreate(mappings, { transaction: t, ignoreDuplicates: true });
                 }
             }
         }
@@ -406,7 +463,7 @@ async function runDeepRepairPhase(progress) {
                 if (authorName.toLowerCase().startsWith("by ")) authorName = authorName.substring(3).trim();
 
                 if (authorName) {
-                    batchUpdates.push({ id: matchedId, author: authorName.substring(0, 255) });
+                    batchUpdates.push({ id: matchedId, author: authorName.substring(0, 2000) });
                     isbnMap.delete(matchedIsbn); // One fix per book
                 }
             }

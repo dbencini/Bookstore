@@ -6,7 +6,7 @@ const csv = require('csv-parser');
 const unzipper = require('unzipper');
 const zlib = require('zlib');
 const readline = require('readline');
-const { Book, Job, Subject, BookSubject, sequelize } = require('../models');
+const { Book, Job, Category, BookCategory, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 // Configure Google Books API URL
@@ -41,7 +41,7 @@ async function fetchGoogleBooks(query = 'subject:fiction') {
             params: {
                 q: query,
                 maxResults: 10,
-                key: process.env.GOOGLE_API_KEY
+                key: process.env.GOOGLE_BOOK_API
             }
         });
 
@@ -73,32 +73,38 @@ async function fetchGoogleBooks(query = 'subject:fiction') {
             }
 
             const bookData = {
-                title: info.title,
-                author: info.authors ? info.authors.join(', ') : 'Unknown',
-                description: info.description,
+                title: (info.title || 'Unknown Title').substring(0, 255),
+                author: (info.authors ? info.authors.join(', ') : 'Unknown').substring(0, 2000),
+                description: (info.description || 'No description available.').substring(0, 4000),
                 price: 19.99,
-                imageUrl: info.imageLinks.thumbnail || info.imageLinks.smallThumbnail,
+                imageUrl: (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || '/images/default_cover.svg').substring(0, 255),
                 isbn: isbn,
                 JobId: job.id
             };
 
-            // Dynamic Subject Handling
+            // Dynamic Category Handling
+            let activeCategoryId = null;
+            const curatedCategories = await Category.findAll({ where: { subject_triggers: { [Op.ne]: null } } });
+            const [defaultCat] = await Category.findOrCreate({ where: { name: 'New Books' } });
+
             if (info.categories && info.categories.length > 0) {
-                const subjectName = info.categories[0];
-                const [subjectObj] = await Subject.findOrCreate({
-                    where: { name: subjectName }
-                });
-                bookData.subjectIdsJson = [subjectObj.id];
-            } else {
-                const defaultSub = await Subject.findOne({ where: { name: 'New Books' } });
-                if (defaultSub) {
-                    bookData.subjectIdsJson = [defaultSub.id];
+                const primarySubject = info.categories[0].toLowerCase();
+                for (const cat of curatedCategories) {
+                    const triggers = cat.subject_triggers.split(',').map(tr => tr.trim().toLowerCase());
+                    if (triggers.some(tr => primarySubject.includes(tr))) {
+                        activeCategoryId = cat.id;
+                        break;
+                    }
                 }
             }
+            if (!activeCategoryId) activeCategoryId = defaultCat.id;
 
             const existing = await Book.findOne({ where: { title: bookData.title } });
             if (!existing) {
-                await Book.create(bookData);
+                const book = await Book.create(bookData);
+                if (activeCategoryId) {
+                    await BookCategory.create({ BookId: book.id, CategoryId: activeCategoryId });
+                }
                 addedCount++;
             }
         }
@@ -166,12 +172,13 @@ async function processDataRepairBackground(job) {
     let processedCount = job.processedCount || 0;
     let fixedCount = job.fixedCount || 0;
     let removedCount = job.removedCount || 0;
+    let lastFixedIsbns = [];
 
     try {
-        const apiKey = process.env.GOOGLE_API_KEY;
+        const apiKey = process.env.GOOGLE_BOOK_API;
         console.log(`[BookService] [Background] Starting Refined Data Repair Job ${job.id} at ID: ${job.lastProcessedId || 'START'}`);
         if (!apiKey) {
-            console.warn("[BookService] [Background] WARNING: GOOGLE_API_KEY is missing. Enrichment will be severely rate-limited.");
+            console.warn("[BookService] [Background] WARNING: GOOGLE_BOOK_API is missing. Enrichment will be severely rate-limited.");
         }
 
         const baseWhere = {
@@ -179,7 +186,7 @@ async function processDataRepairBackground(job) {
             [Op.or]: [
                 { description: { [Op.or]: [null, '', 'No description available.'] } },
                 { author: { [Op.or]: [null, '', 'Unknown'] } },
-                { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, { [Op.like]: '%default_cover.svg%' }] } }
+                { imageUrl: { [Op.or]: [null, '', { [Op.like]: '%placehold.co%' }, { [Op.like]: '%default_cover.svg%' }, { [Op.like]: '%placeholder-book.png%' }] } }
             ]
         };
 
@@ -239,7 +246,7 @@ async function processDataRepairBackground(job) {
                         params: {
                             q: query,
                             maxResults: 1,
-                            key: process.env.GOOGLE_API_KEY
+                            key: process.env.GOOGLE_BOOK_API
                         }
                     });
 
@@ -249,19 +256,22 @@ async function processDataRepairBackground(job) {
                         let updated = false;
 
                         if ((!book.description || book.description === 'No description available.') && info.description) {
-                            book.description = info.description;
+                            book.description = info.description.substring(0, 4000);
                             updated = true;
                         }
 
                         if ((!book.author || book.author === 'Unknown') && info.authors && info.authors.length > 0) {
-                            book.author = info.authors.join(', ');
+                            book.author = info.authors.join(', ').substring(0, 2000);
                             updated = true;
                         }
 
-                        if ((!book.imageUrl || book.imageUrl.includes('placehold.co')) &&
-                            info.imageLinks && (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail)) {
-                            book.imageUrl = info.imageLinks.thumbnail || info.imageLinks.smallThumbnail;
-                            updated = true;
+                        const newImageUrl = info.imageLinks ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail) : null;
+                        if (newImageUrl) {
+                            const cleanNewImage = newImageUrl.substring(0, 255);
+                            if (book.imageUrl !== cleanNewImage) {
+                                book.imageUrl = cleanNewImage;
+                                updated = true;
+                            }
                         }
 
                         if (updated) {
@@ -269,6 +279,24 @@ async function processDataRepairBackground(job) {
                             await book.save();
                             fixedCount++;
                         }
+
+                        // Category Enrichment (if book has no categories)
+                        const currentCatCount = await BookCategory.count({ where: { BookId: book.id } });
+                        if (currentCatCount === 0 && info.categories && info.categories.length > 0) {
+                            const catIds = [];
+                            for (const catName of info.categories.slice(0, 5)) {
+                                const [cat] = await Category.findOrCreate({ where: { name: catName.substring(0, 255) } });
+                                catIds.push(cat.id);
+                            }
+
+                            if (catIds.length > 0) {
+                                const links = catIds.map(cid => ({ BookId: book.id, CategoryId: cid }));
+                                await BookCategory.bulkCreate(links, { ignoreDuplicates: true });
+                            }
+                        }
+
+                        lastFixedIsbns.push(book.isbn);
+                        if (lastFixedIsbns.length > 3) lastFixedIsbns.shift();
                     } else {
                         // If ISBN lookup fails, we mark it so we don't try again or destroy if it's junk
                         if ((!book.description || book.description === 'No description available.') &&
@@ -294,7 +322,8 @@ async function processDataRepairBackground(job) {
                 if (processedCount % 5 === 0) {
                     const progress = Math.min(99, Math.round((processedCount / (processedCount + (totalToFix - processedCount))) * 100));
                     job.progress = progress;
-                    job.summary = `Repairing Priority Books: ${processedCount.toLocaleString()} processed. Fixed: ${fixedCount}.`;
+                    let exampleText = lastFixedIsbns.length > 0 ? ` For example ${lastFixedIsbns.join(', ')}` : '';
+                    job.summary = `Repairing Priority Books: ${processedCount.toLocaleString()} processed. Fixed: ${fixedCount}.${exampleText}`;
                     await job.save();
                 }
             }
@@ -499,12 +528,12 @@ async function processBatch(rows, job, markup) {
     let added = 0;
     let updated = 0;
 
-    // 1. Pre-fetch Subjects
-    const subjectNames = [...new Set(rows.map(r => r.category || 'New Books'))];
-    const subjectMap = {};
-    for (const name of subjectNames) {
-        const [sub] = await Subject.findOrCreate({ where: { name } });
-        subjectMap[name] = sub.id;
+    // 1. Pre-fetch Categories
+    const categoryNames = [...new Set(rows.map(r => r.category || 'New Books'))];
+    const categoryMap = {};
+    for (const name of categoryNames) {
+        const [cat] = await Category.findOrCreate({ where: { name } });
+        categoryMap[name] = cat.id;
     }
 
     // 2. Pre-fetch Existing Books in this batch
@@ -543,18 +572,21 @@ async function processBatch(rows, job, markup) {
             const finalPrice = cost * (1 + parseFloat(markup) / 100);
 
             const bookData = {
-                title: title || 'Unknown Title',
-                author: row.author || 'Unknown',
-                description: row.description || row.summary || 'No description available.',
+                title: (title || 'Unknown Title').substring(0, 255),
+                author: (row.author || 'Unknown').substring(0, 2000),
+                description: (row.description || row.summary || 'No description available.').substring(0, 4000),
                 price: finalPrice || 19.99,
                 price_cost: cost,
-                imageUrl: row.imageurl || row.image || '/images/default_cover.svg',
-                subjectIdsJson: [subjectMap[row.category || 'New Books']],
+                imageUrl: (row.imageurl || row.image || '/images/default_cover.svg').substring(0, 255),
                 isbn: isbn || null,
                 status: status || 'ready', // Default to ready if we got this far
                 bind: row.bind || null,
                 pur: row.pur || row.bind || null,
-                isVisible: true, // If it's ready, it's visible
+                isVisible: (
+                    (row.description || row.summary || 'No description available.') !== 'No description available.' &&
+                    (row.author || 'Unknown') !== 'Unknown' &&
+                    (row.author || 'Unknown').trim() !== ''
+                ),
                 JobId: job.id
             };
 
@@ -567,13 +599,24 @@ async function processBatch(rows, job, markup) {
             }
 
             if (!existingId) {
-                await Book.create(bookData, { transaction: t });
+                const book = await Book.create(bookData, { transaction: t });
+                const catId = categoryMap[row.category || 'New Books'];
+                if (catId) {
+                    await BookCategory.create({ BookId: book.id, CategoryId: catId }, { transaction: t });
+                }
                 added++;
             } else {
                 await Book.update(bookData, {
                     where: { id: existingId },
                     transaction: t
                 });
+                const catId = categoryMap[row.category || 'New Books'];
+                if (catId) {
+                    await BookCategory.findOrCreate({
+                        where: { BookId: existingId, CategoryId: catId },
+                        transaction: t
+                    });
+                }
                 updated++;
             }
         }
@@ -1074,6 +1117,16 @@ async function processBatchUpdates(updates) {
 
             // Update Book fields (Title, Author, Desc etc)
             if (Object.keys(bookData).length > 0) {
+                // Enforce visibility
+                const hasDescription = bookData.description && bookData.description.trim() !== '' && bookData.description !== 'No description available.';
+                const hasAuthor = bookData.author && bookData.author !== 'Unknown' && bookData.author.trim() !== '';
+
+                if (hasDescription && hasAuthor) {
+                    bookData.isVisible = true;
+                } else {
+                    bookData.isVisible = false;
+                }
+
                 await Book.update(bookData, { where: { id }, transaction: t });
             }
 

@@ -6,8 +6,6 @@ const Book = require('./Book');
 const CartItem = require('./CartItem');
 const Order = require('./Order');
 const SiteConfig = require('./SiteConfig');
-const Subject = require('./Subject');
-const BookSubject = require('./BookSubject');
 const Category = require('./Category');
 const BookCategory = require('./BookCategory');
 const Job = require('./Job');
@@ -97,8 +95,6 @@ module.exports = {
     CartItem,
     Order,
     SiteConfig,
-    Subject,
-    BookSubject,
     Category,
     BookCategory,
     Job,

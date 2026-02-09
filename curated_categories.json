@@ -1,0 +1,72 @@
+[
+  {
+    "id": "05c5331b-8e05-44c6-a46d-4d1fbe9208dc",
+    "name": "Social Sciences",
+    "triggers": "social, sociology, political, law, anthropology"
+  },
+  {
+    "id": "258dcc49-3e86-4cfb-bc58-d861871c0913",
+    "name": "History & Biography",
+    "triggers": "history, biography, memoir, genealogy, historical"
+  },
+  {
+    "id": "2ffbfe82-5879-4176-b20b-96c4325ad9b3",
+    "name": "Health & Medical",
+    "triggers": "health, medical, fitness, medicine, nursing"
+  },
+  {
+    "id": "31928089-eead-44f8-a88d-11e3c16bf33e",
+    "name": "Science & Technology",
+    "triggers": "science, technology, physics, biology, computer"
+  },
+  {
+    "id": "32f4fb86-be6a-418b-a00c-1b1246c2a8fe",
+    "name": "Self-Help & Personal Development",
+    "triggers": "self-help, development, motivation, success, psychology"
+  },
+  {
+    "id": "5c8f09b0-5336-4440-8312-c05eb2bd286b",
+    "name": "Art & Architecture",
+    "triggers": "art, architecture, painting, sculpture, design"
+  },
+  {
+    "id": "69e2c126-af48-4087-8f72-0097e907cb1f",
+    "name": "Fiction & Literature",
+    "triggers": "fiction, novel, poetry, literature, drama"
+  },
+  {
+    "id": "6b14e110-9851-4f44-b666-4c70649ecbf5",
+    "name": "Business & Finance",
+    "triggers": "business, finance, accounting, economy, investing"
+  },
+  {
+    "id": "6c248fe3-72cb-4b29-82b8-34f635fabd61",
+    "name": "Travel & Geography",
+    "triggers": "travel, geography, guide, atlas, touring"
+  },
+  {
+    "id": "8549c4df-836d-436b-a9d9-374796a18563",
+    "name": "Religion & Philosophy",
+    "triggers": "religion, philosophy, theology, bible, spiritual"
+  },
+  {
+    "id": "aa64be1d-9946-4cb3-a1a5-7b1b12246a96",
+    "name": "Cooking & Food",
+    "triggers": "cooking, cookbook, recipe, food, diet"
+  },
+  {
+    "id": "ac8d77d7-a2d8-4719-9dcc-3c857f66d9f4",
+    "name": "Crafts & Hobbies",
+    "triggers": "craft, hobby, gardening, collecting, sewing"
+  },
+  {
+    "id": "b494c8b6-3de2-42ed-bf20-2192bc1c967e",
+    "name": "Reference & Study",
+    "triggers": "reference, dictionary, encyclopedia, study, textbook"
+  },
+  {
+    "id": "eecf85e5-99f2-4ea8-9f3d-6017bc1351ea",
+    "name": "Children & Young Adult",
+    "triggers": "child, juvenile, young adult, youth, teenager"
+  }
+]

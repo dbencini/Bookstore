@@ -22,9 +22,9 @@ async function axiosWithRetry(url, config, retries = 3, delay = 5000) {
 }
 
 async function runRepair() {
-    const apiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GOOGLE_BOOK_API;
     if (!apiKey) {
-        console.warn("\n[WARNING] GOOGLE_API_KEY is missing from .env. Enrichment will be severely rate-limited.\n");
+        console.warn("\n[WARNING] GOOGLE_BOOK_API is missing from .env. Enrichment will be severely rate-limited.\n");
     }
 
     console.log("[RepairAuthors] Identifying books with missing authors but existing ISBNs...");

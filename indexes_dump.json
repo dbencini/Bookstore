@@ -1,0 +1,179 @@
+[
+  {
+    "primary": true,
+    "fields": [
+      {
+        "attribute": "id",
+        "order": "ASC"
+      }
+    ],
+    "name": "PRIMARY",
+    "tableName": "books",
+    "unique": true,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "isbn",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_isbn",
+    "tableName": "books",
+    "unique": true,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "JobId",
+        "order": "ASC"
+      }
+    ],
+    "name": "JobId",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "title",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_title",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "imageUrl",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_image_url",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "author",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_author",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "isVisible",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_is_visible",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "createdAt",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_created_at",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "updatedAt",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_updated_at",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "isVisible",
+        "order": "ASC"
+      },
+      {
+        "attribute": "createdAt",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_is_visible_created_at",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "isVisible",
+        "order": "ASC"
+      },
+      {
+        "attribute": "updatedAt",
+        "order": "ASC"
+      }
+    ],
+    "name": "books_is_visible_updated_at",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "isbn",
+        "order": "ASC"
+      }
+    ],
+    "name": "idx_books_isbn",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  },
+  {
+    "primary": false,
+    "fields": [
+      {
+        "attribute": "title",
+        "order": "ASC"
+      }
+    ],
+    "name": "idx_books_title",
+    "tableName": "books",
+    "unique": false,
+    "type": "BTREE"
+  }
+]

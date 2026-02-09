@@ -1,4 +1,24 @@
 const express = require('express');
+// Global Count Cache (identical to routes/index.js)
+let globalBookCount = null;
+let lastCountFetch = 0;
+const GLOBAL_COUNT_TTL = 1000 * 60 * 60; // 1 hour
+
+const getGlobalCount = async () => {
+    if (globalBookCount !== null && (Date.now() - lastCountFetch < GLOBAL_COUNT_TTL)) {
+        return globalBookCount;
+    }
+    try {
+        const [result] = await sequelize.query('SELECT COUNT(*) as count FROM books WHERE isVisible = true');
+        globalBookCount = (result && result[0]) ? result[0].count : (globalBookCount || 0);
+        lastCountFetch = Date.now();
+        return globalBookCount;
+    } catch (err) {
+        console.error('Failed to fetch global count:', err);
+        return globalBookCount || 0;
+    }
+};
+
 const router = express.Router();
 const { sequelize, User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem, OrderSource, CpOrderItem, CpOrder, CpFile, CpAddress, Op } = require('../models');
 
@@ -123,18 +143,23 @@ router.get('/workshop', async (req, res) => {
 
 // Dashboard
 router.get('/', async (req, res) => {
-    const userCount = await User.count();
-    const bookCount = await Book.count();
-    const adminCount = await User.count({
-        include: { model: UserType, where: { name: 'Admin' } }
-    });
+    try {
+        const userCount = await User.count();
+        const bookCount = await getGlobalCount();
+        const adminCount = await User.count({
+            include: { model: UserType, where: { name: 'Admin' } }
+        });
 
-    res.render('admin/dashboard', {
-        userCount,
-        bookCount,
-        adminCount,
-        page: 'dashboard'
-    });
+        res.render('admin/dashboard', {
+            userCount,
+            bookCount,
+            adminCount,
+            page: 'dashboard'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Dashboard Error');
+    }
 });
 
 // User Management
@@ -245,7 +270,10 @@ router.get('/books', async (req, res) => {
             where.isVisible = true;
             if (title) where.title = { [Op.like]: `%${title}%` };
             if (author) where.author = { [Op.like]: `%${author}%` };
-            if (isbn) where.isbn = { [Op.like]: `%${isbn}%` };
+            if (isbn) {
+                const cleanIsbn = isbn.replace(/[-\s]/g, '');
+                where.isbn = cleanIsbn;
+            }
 
             // Date Range Search with validation
             if (startDate || endDate) {
@@ -294,14 +322,30 @@ router.get('/books', async (req, res) => {
             }
         }
 
-        const count = await Book.count({ where });
-
-        const rows = await Book.findAll({
-            where,
-            limit,
-            offset,
-            order: [['updatedAt', 'DESC']]
-        });
+        if (!isSearching) {
+            // High-performance path: Use Index Hint + Cached/Optimized Count
+            count = await getGlobalCount();
+            rows = await sequelize.query(`
+                SELECT * FROM books USE INDEX (books_is_visible_updated_at)
+                WHERE isVisible = true 
+                ORDER BY updatedAt DESC 
+                LIMIT :limit OFFSET :offset
+            `, {
+                replacements: { limit, offset },
+                type: sequelize.QueryTypes.SELECT,
+                model: Book,
+                mapToModel: true
+            });
+        } else {
+            // Searching/Filtering path
+            count = await Book.count({ where });
+            rows = await Book.findAll({
+                where,
+                limit,
+                offset,
+                order: [['updatedAt', 'DESC']]
+            });
+        }
 
         if (rows.length > 0) {
             const bookIds = rows.map(b => b.id);
@@ -401,21 +445,7 @@ router.post('/books/:id/update', async (req, res) => {
 
             if (req.body.categoryIds) {
                 const catIds = Array.isArray(req.body.categoryIds) ? req.body.categoryIds : [req.body.categoryIds];
-                // Since books are linked to categories VIA subjects, updating categories means
-                // we should associate the book with subjects that belong to those categories.
-                // For simplicity, we'll find any subjects that are in the selected categories.
-                const subjectsToLink = await Subject.findAll({
-                    include: [{
-                        model: Category,
-                        where: { id: { [Op.in]: catIds } }
-                    }]
-                });
-                if (subjectsToLink.length > 0) {
-                    const subIds = subjectsToLink.map(s => s.id);
-                    await book.setSubjects(subIds);
-                    // Sync the JSON field too
-                    book.subjectIdsJson = subIds;
-                }
+                await book.setCategories(catIds);
             }
 
             if (price) book.price = parseFloat(price);
@@ -429,8 +459,16 @@ router.post('/books/:id/update', async (req, res) => {
 
             if (description !== undefined) book.description = description;
 
-            // Checkbox handling: likely 'on' if checked, undefined if unchecked
-            book.isVisible = (isVisible === 'on');
+            // Enforce visibility rules: Hide if no description or placeholder author
+            const hasDescription = book.description && book.description.trim() !== '' && book.description !== 'No description available.';
+            const hasAuthor = book.author && book.author !== 'Unknown' && book.author.trim() !== '';
+
+            if (!hasDescription || !hasAuthor) {
+                book.isVisible = false;
+            } else {
+                // Checkbox handling: likely 'on' if checked, undefined if unchecked
+                book.isVisible = (isVisible === 'on');
+            }
 
             await book.save();
 
