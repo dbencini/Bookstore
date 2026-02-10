@@ -9,7 +9,7 @@ const readline = require('readline');
 // --- CONFIGURATION ---
 const CSV_PATH = path.join(__dirname, 'uploads', 'POD_Library.csv');
 const DUMP_PATHS = [
-    path.join(__dirname, 'uploads', 'GoogleHugeFile.txt'),
+    path.join(__dirname, 'uploads', 'OpenLibraryBooks.txt'),
     path.join(__dirname, 'uploads', 'ol_dump_editions.txt')
 ];
 const PROGRESS_FILE = path.join(__dirname, 'migration_progress.json');
@@ -204,7 +204,7 @@ async function runRepairPhase(progress) {
     // 1. Find the local dump file
     const activePath = DUMP_PATHS.find(p => fs.existsSync(p));
     if (!activePath) {
-        console.log('[Phase 2] WARNING: No Open Library dump found (GoogleHugeFile.txt). Skipping Enrichment Phase.');
+        console.log('[Phase 2] WARNING: No Open Library dump found (OpenLibraryBooks.txt). Skipping Enrichment Phase.');
         return;
     }
     console.log(`[Phase 2] Using dump: ${path.basename(activePath)}`);

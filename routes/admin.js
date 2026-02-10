@@ -29,7 +29,7 @@ const { sequelize, User, UserType, Book, Category, Job, FooterSetting, Order, Or
 // Book Management
 // Middleware Imports
 const requireAdmin = require('../middleware/adminAuth');
-const { fetchGoogleBooks, fixBookData, importBooksFromCSV, importManualZip, stopJob, pauseJob, resumeJob } = require('../services/bookService');
+const { fetchGoogleBooks, fixBookData, fastAuthorRepair, importBooksFromCSV, importManualZip, stopJob, pauseJob, resumeJob } = require('../services/bookService');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
@@ -145,14 +145,17 @@ router.get('/workshop', async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const userCount = await User.count();
-        const bookCount = await getGlobalCount();
+        const visibleBookCount = await getGlobalCount();
+        const totalBookCount = await Book.count();
         const adminCount = await User.count({
             include: { model: UserType, where: { name: 'Admin' } }
         });
 
         res.render('admin/dashboard', {
             userCount,
-            bookCount,
+            bookCount: visibleBookCount,
+            totalBookCount,
+            visibleBookCount,
             adminCount,
             page: 'dashboard'
         });
@@ -262,12 +265,48 @@ router.get('/books', async (req, res) => {
 
         const where = {};
 
+        // Quick Filter Support for Missing Data
+        const quickFilter = sanitize(req.query.filter);
+        let isQuickFilter = false;
+
+        if (quickFilter) {
+            isQuickFilter = true;
+            switch (quickFilter) {
+                case 'missing_author':
+                    where.author = { [Op.or]: [null, '', 'Unknown'] };
+                    break;
+                case 'missing_image':
+                    where.imageUrl = {
+                        [Op.or]: [
+                            null,
+                            '',
+                            { [Op.like]: '%placehold.co%' },
+                            { [Op.like]: '%default_cover.svg%' },
+                            { [Op.like]: '%placeholder-book.png%' }
+                        ]
+                    };
+                    break;
+                case 'missing_title':
+                    where.title = { [Op.or]: [null, ''] };
+                    break;
+                case 'missing_description':
+                    where.description = { [Op.or]: [null, '', 'No description available.'] };
+                    break;
+                case 'missing_price':
+                    where.price = { [Op.or]: [null, 0] };
+                    break;
+                case 'incomplete':
+                    where.isVisible = false;
+                    break;
+            }
+        }
+
         // Detect if any search filter is active
-        const isSearching = !!(title || author || category || isbn || startDate || endDate);
+        const isSearching = !!(title || author || category || isbn || startDate || endDate || isQuickFilter);
         const isCategorySearch = !!category;
 
         if (isSearching) {
-            where.isVisible = true;
+            // Admin can see ALL books - no visibility filtering
             if (title) where.title = { [Op.like]: `%${title}%` };
             if (author) where.author = { [Op.like]: `%${author}%` };
             if (isbn) {
@@ -295,18 +334,8 @@ router.get('/books', async (req, res) => {
                     where.createdAt = dateFilter;
                 }
             }
-        } else {
-            // Initial View: Only show books that have images (excluding placeholders)
-            where.imageUrl = {
-                [Op.and]: [
-                    { [Op.ne]: null },
-                    { [Op.ne]: '' },
-                    { [Op.ne]: '/images/placeholder-book.png' },
-                    { [Op.ne]: 'https://placehold.co/200x300' },
-                    { [Op.ne]: '/images/default_cover.svg' }
-                ]
-            };
         }
+        // REMOVED: Image filter - admins should see all books including those without images
 
         // Optimization: Only include Category in the main query if searching by it
         // Join-based filtering on 5M rows is expensive, but necessary for specific category search.
@@ -397,7 +426,61 @@ router.get('/books', async (req, res) => {
     }
 });
 
+// Category Matching API (for Google Books fetch)
+router.post('/books/match-categories', async (req, res) => {
+    try {
+        const { subjects } = req.body;
+
+        if (!subjects || !Array.isArray(subjects)) {
+            return res.json({ success: false, error: 'Invalid subjects array' });
+        }
+
+        // Get all categories with their subject_triggers
+        const allCategories = await Category.findAll({
+            attributes: ['id', 'name', 'subject_triggers']
+        });
+
+        const matchedCategoryIds = [];
+
+        // For each subject from Google Books, check against category triggers
+        for (const subject of subjects) {
+            const subjectLower = subject.toLowerCase().trim();
+
+            for (const category of allCategories) {
+                if (!category.subject_triggers) continue;
+
+                // Parse comma-separated triggers
+                const triggers = category.subject_triggers
+                    .split(',')
+                    .map(t => t.toLowerCase().trim())
+                    .filter(t => t.length > 0);
+
+                // Check if any trigger matches this subject
+                for (const trigger of triggers) {
+                    if (subjectLower.includes(trigger) || trigger.includes(subjectLower)) {
+                        if (!matchedCategoryIds.includes(category.id)) {
+                            matchedCategoryIds.push(category.id);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If no matches, return empty array (don't auto-add to "New Books")
+        res.json({
+            success: true,
+            categoryIds: matchedCategoryIds,
+            matchCount: matchedCategoryIds.length
+        });
+    } catch (err) {
+        console.error('Category matching error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 router.post('/books/:id/toggle', async (req, res) => {
+
     try {
         const book = await Book.findByPk(req.params.id);
         if (book) {
@@ -440,8 +523,7 @@ router.post('/books/:id/update', async (req, res) => {
         const book = await Book.findByPk(req.params.id);
         if (book) {
             const { categoryId, price, imageUrl, stock, description, isVisible, isbn } = req.body;
-            console.log('[DEBUG] Update Body:', req.body);
-            console.log('[DEBUG] Received Description:', description);
+
 
             if (req.body.categoryIds) {
                 const catIds = Array.isArray(req.body.categoryIds) ? req.body.categoryIds : [req.body.categoryIds];
@@ -525,7 +607,7 @@ router.post('/jobs/trigger', async (req, res) => {
 });
 
 // Job Status Polling
-router.get('/jobs/:id/status', async (req, res) => {
+router.get('/api/jobs/:id/status', async (req, res) => {
     try {
         const job = await Job.findByPk(req.params.id);
         if (!job) return res.status(404).json({ error: 'Job not found' });
@@ -533,7 +615,10 @@ router.get('/jobs/:id/status', async (req, res) => {
             status: job.status,
             progress: job.progress || 0,
             summary: job.summary,
-            booksAdded: job.booksAdded
+            booksAdded: job.booksAdded,
+            startTime: job.startTime,
+            type: job.type,
+            fixedCount: job.fixedCount
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -614,7 +699,7 @@ router.post('/import/manual-zip', async (req, res) => {
     }
 });
 
-router.get('/jobs', async (req, res) => {
+router.get('/api/jobs', async (req, res) => {
     try {
         const { status, limit = 10 } = req.query;
         const where = {};
@@ -642,7 +727,101 @@ router.post('/import/fix-thumbnails', async (req, res) => {
     }
 });
 
+// Fast Author-Only Repair (STABLE VERSION - resumable, low memory)
+router.post('/import/fast-author-repair', async (req, res) => {
+    try {
+        const { repairAuthorsStable } = require('../repair_authors_stable');
+
+        // Start stable repair in background
+        repairAuthorsStable().catch(err => {
+            console.error('[Admin] Author repair error:', err);
+        });
+
+        // Small delay to ensure job is created
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Get the most recent RUNNING author_repair_stable job
+        const job = await Job.findOne({
+            where: {
+                type: 'author_repair_stable',
+                status: 'running'
+            },
+            order: [['id', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            jobId: job ? job.id : null
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Check Hidden Books and Update Visibility
+router.post('/import/check-hidden-books', async (req, res) => {
+    try {
+        console.log('[Admin] Checking hidden books for visibility eligibility...');
+
+        // Get all hidden books
+        const hiddenBooks = await Book.findAll({
+            where: { isVisible: false }
+        });
+
+        let checked = hiddenBooks.length;
+        let updated = 0;
+        let pricesFixed = 0;
+
+        for (const book of hiddenBooks) {
+            let needsSave = false;
+
+            // Check if price is missing but cost_price exists
+            if ((!book.price || book.price === 0) && book.price_cost && book.price_cost > 0) {
+                book.price = (book.price_cost * 1.15).toFixed(2);
+                pricesFixed++;
+                needsSave = true;
+            }
+
+            // Check if book qualifies for visibility
+            const hasImage = book.imageUrl &&
+                book.imageUrl !== '' &&
+                !book.imageUrl.includes('placeholder');
+            const hasAuthor = book.author &&
+                book.author !== '' &&
+                book.author !== 'Unknown';
+            const hasTitle = book.title && book.title !== '';
+            const hasPrice = book.price && book.price > 0;
+
+            // Make visible if all criteria met
+            if (hasImage && hasAuthor && hasTitle && hasPrice) {
+                book.isVisible = true;
+                updated++;
+                needsSave = true;
+            }
+
+            if (needsSave) {
+                await book.save();
+            }
+        }
+
+        console.log(`[Admin] Hidden books check complete: ${updated} made visible, ${pricesFixed} prices fixed, ${checked} total checked`);
+
+        res.json({
+            success: true,
+            checked,
+            updated,
+            pricesFixed
+        });
+    } catch (err) {
+        console.error('[Admin] Error checking hidden books:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 router.get('/repair/dump-status', async (req, res) => {
+
+
     try {
         const path = require('path');
         const fs = require('fs');
@@ -1306,10 +1485,10 @@ router.get('/repair/google-huge-file/sample', async (req, res) => {
         const path = require('path');
         const fs = require('fs');
         const readline = require('readline');
-        const filePath = path.join(__dirname, '../uploads/GoogleHugeFile.txt');
+        const filePath = path.join(__dirname, '../uploads/OpenLibraryBooks.txt');
 
         if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ success: false, error: 'GoogleHugeFile.txt not found in uploads directory.' });
+            return res.status(404).json({ success: false, error: 'OpenLibraryBooks.txt not found in uploads directory.' });
         }
 
         const fileStream = fs.createReadStream(filePath);

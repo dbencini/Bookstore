@@ -151,6 +151,147 @@ async function fixBookData() {
     return { success: true, jobId: job.id };
 }
 
+// Fast Author-Only Repair (optimized for speed)
+async function fastAuthorRepair() {
+    const job = await Job.create({
+        type: 'fast_author_repair',
+        summary: 'Initializing fast author repair...',
+        startTime: new Date(),
+        status: 'running',
+        progress: 0
+    });
+
+    activeJobs.add(job.id);
+
+    // Run in background
+    processAuthorRepairBackground(job).catch(err => {
+        console.error('[BookService] Fatal Author Repair Error:', err);
+    });
+
+    return { success: true, jobId: job.id };
+}
+
+async function processAuthorRepairBackground(job) {
+    let processedCount = job.processedCount || 0;
+    let fixedCount = job.fixedCount || 0;
+    let lastFixedIsbns = [];
+
+    try {
+        const apiKey = process.env.GOOGLE_BOOK_API;
+        console.log(`[BookService] [Fast Author Repair] Starting ${job.id}`);
+        if (!apiKey) {
+            console.warn("[BookService] WARNING: GOOGLE_BOOK_API is missing. Repair will be rate-limited.");
+        }
+
+        // Target ONLY books missing authors
+        const baseWhere = {
+            isbn: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] },
+            [Op.or]: [
+                { author: null },
+                { author: '' },
+                { author: 'Unknown' }
+            ]
+        };
+
+        const totalToFix = await Book.count({ where: baseWhere });
+        console.log(`[BookService] Identified ${totalToFix.toLocaleString()} books missing authors.`);
+
+        if (totalToFix === 0) {
+            job.status = 'completed';
+            job.progress = 100;
+            job.summary = 'No books found missing authors.';
+            job.endTime = new Date();
+            await job.save();
+            activeJobs.delete(job.id);
+            return;
+        }
+
+        const BATCH_SIZE = 50; // Larger batches for speed
+        const DELAY_MS = 1000; // 1 second delay (vs 3 seconds)
+
+        while (true) {
+            await job.reload();
+            if (!activeJobs.has(job.id)) {
+                console.log(`[BookService] Author Repair Job ${job.id} stopped.`);
+                break;
+            }
+
+            const books = await Book.findAll({
+                where: baseWhere,
+                limit: BATCH_SIZE,
+                order: [['stock', 'DESC'], ['id', 'ASC']]
+            });
+
+            if (books.length === 0) break;
+
+            for (const book of books) {
+                if (!activeJobs.has(job.id)) break;
+
+                processedCount++;
+
+                try {
+                    // 1 second delay between calls
+                    await new Promise(r => setTimeout(r, DELAY_MS));
+
+                    const query = `isbn:${book.isbn}`;
+                    const response = await axiosWithRetry(GOOGLE_BOOKS_API_URL, {
+                        params: {
+                            q: query,
+                            maxResults: 1,
+                            key: apiKey
+                        }
+                    });
+
+                    const items = response.data.items || [];
+                    if (items.length > 0) {
+                        const info = items[0].volumeInfo;
+
+                        // ONLY fetch and save author
+                        if (info.authors && info.authors.length > 0) {
+                            book.author = info.authors.join(', ').substring(0, 2000);
+                            book.JobId = job.id;
+                            await book.save();
+                            fixedCount++;
+                            lastFixedIsbns.push(book.isbn);
+                            if (lastFixedIsbns.length > 3) lastFixedIsbns.shift();
+                        }
+                    }
+                } catch (apiErr) {
+                    console.warn(`[BookService] API Error for ISBN ${book.isbn}: ${apiErr.message}`);
+                    if (apiErr.response && apiErr.response.status === 429) {
+                        await new Promise(r => setTimeout(r, 60000));
+                    }
+                }
+
+                // Update progress
+                job.processedCount = processedCount;
+                job.fixedCount = fixedCount;
+                job.progress = Math.min(95, Math.floor((processedCount / totalToFix) * 100));
+
+                const exampleText = lastFixedIsbns.length > 0 ? ` Examples: ${lastFixedIsbns.join(', ')}` : '';
+                job.summary = `Author Repair: ${processedCount.toLocaleString()} processed. Fixed: ${fixedCount}.${exampleText}`;
+                await job.save();
+            }
+        }
+
+        job.status = 'completed';
+        job.progress = 100;
+        job.summary = `Author Repair Complete! Processed: ${processedCount.toLocaleString()}. Authors added: ${fixedCount.toLocaleString()}.`;
+        job.endTime = new Date();
+        await job.save();
+        activeJobs.delete(job.id);
+
+    } catch (err) {
+        console.error('[BookService] Author Repair Error:', err);
+        job.status = 'failed';
+        job.summary = `Author Repair Failed: ${err.message}`;
+        job.endTime = new Date();
+        await job.save();
+        activeJobs.delete(job.id);
+    }
+}
+
+
 async function axiosWithRetry(url, config, retries = 5, delay = 5000) {
     try {
         return await axios.get(url, config);
@@ -275,6 +416,23 @@ async function processDataRepairBackground(job) {
                         }
 
                         if (updated) {
+                            // Auto-calculate price from cost if missing
+                            if ((!book.price || book.price === 0) && book.price_cost && book.price_cost > 0) {
+                                book.price = parseFloat((book.price_cost * 1.15).toFixed(2));
+                            }
+
+                            // Determine visibility based on completeness (NO description requirement)
+                            const hasPrice = book.price && book.price > 0;
+                            const hasTitle = book.title && book.title.trim().length > 0;
+                            const hasAuthor = book.author && book.author !== 'Unknown' && book.author.trim().length > 0;
+                            const hasImage = book.imageUrl &&
+                                !book.imageUrl.includes('placehold.co') &&
+                                !book.imageUrl.includes('default_cover.svg') &&
+                                !book.imageUrl.includes('placeholder-book.png');
+
+                            // Set visibility: must have price, title, author, and image
+                            book.isVisible = (hasPrice && hasTitle && hasAuthor && hasImage);
+
                             book.JobId = job.id;
                             await book.save();
                             fixedCount++;
@@ -717,7 +875,7 @@ async function runUltimateRepair(job) {
     try {
         // 1. Detect Dump File (Prioritize unzipped for speed)
         const unzippedPaths = [
-            path.join(__dirname, '../uploads/GoogleHugeFile.txt'),
+            path.join(__dirname, '../uploads/OpenLibraryBooks.txt'),
             path.join(__dirname, '../uploads/ol_dump_editions.txt')
         ];
 
@@ -1154,6 +1312,7 @@ async function processBatchUpdates(updates) {
 module.exports = {
     fetchGoogleBooks,
     fixBookData,
+    fastAuthorRepair,
     importBooksFromCSV,
     importManualZip,
     stopJob,

@@ -61,9 +61,37 @@
                         <button type="submit" class="btn btn-sm btn-primary">Search</button>
                     </div>
                 </form>
+
+                <!-- Quick Filters for Missing Data -->
+                <div class="mt-3 pt-3 border-top">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted fw-bold">Quick Filters:</small>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="/admin/books?filter=missing_author" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-person-x"></i> Missing Authors
+                        </a>
+                        <a href="/admin/books?filter=missing_image" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-image"></i> Missing Images
+                        </a>
+                        <a href="/admin/books?filter=missing_title" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-file-text"></i> Missing Titles
+                        </a>
+                        <a href="/admin/books?filter=missing_description" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-card-text"></i> Missing Descriptions
+                        </a>
+                        <a href="/admin/books?filter=missing_price" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-currency-dollar"></i> Missing Price
+                        </a>
+                        <a href="/admin/books?filter=incomplete" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-exclamation-triangle"></i> Incomplete (Hidden)
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
 
 
 
@@ -229,8 +257,14 @@
                     <div class="modal-content" style="min-height: 500px;">
                         <div class="modal-header bg-primary text-white" style="cursor: move;">
                             <h5 class="modal-title">Edit Book</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                                aria-label="Close"></button>
+                            <div class="d-flex gap-2 align-items-center">
+                                <button type="button" id="btnFetchGoogleData" class="btn btn-sm btn-warning"
+                                    title="Fetch data from Google Books API">
+                                    <i class="bi bi-cloud-download"></i> Fetch from Google
+                                </button>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
                         </div>
                         <div class="modal-body">
                             <form id="updateBookForm" method="POST">
@@ -292,7 +326,7 @@
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label fw-bold">Price (R)</label>
                                                     <input type="number" name="price" id="modalBookPrice"
-                                                        class="form-control" step="0.01" min="0" lang="en-ZA">
+                                                        class="form-control" step="0.01" min="0">
                                                 </div>
                                             </div>
                                             <div class="row">
@@ -474,6 +508,104 @@
                                 editModal.show();
                             });
                         });
+
+                        // --- Fetch from Google Books API ---
+                        document.getElementById('btnFetchGoogleData').addEventListener('click', async function () {
+                            const isbn = document.getElementById('modalBookIsbn').value;
+
+                            if (!isbn || isbn.trim().length === 0) {
+                                alert('No ISBN found. Cannot fetch data from Google Books API.');
+                                return;
+                            }
+
+                            // Disable button and show loading state
+                            const btn = this;
+                            const originalHTML = btn.innerHTML;
+                            btn.disabled = true;
+                            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Fetching...';
+
+                            try {
+                                const query = `isbn:${isbn.trim()}`;
+                                const apiKey = '<%= process.env.GOOGLE_BOOK_API || "" %>';
+                                const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1${apiKey ? '&key=' + apiKey : ''}`;
+
+
+                                const response = await fetch(url);
+                                const data = await response.json();
+
+                                if (data.items && data.items.length > 0) {
+                                    const book = data.items[0].volumeInfo;
+
+                                    // Populate form fields (but don't save)
+                                    if (book.title) {
+                                        document.getElementById('modalBookTitle').value = book.title.substring(0, 255);
+                                    }
+
+                                    if (book.authors && book.authors.length > 0) {
+                                        document.getElementById('modalBookAuthor').value = book.authors.join(', ').substring(0, 2000);
+                                    }
+
+                                    if (book.description) {
+                                        document.getElementById('modalBookDescription').value = book.description.substring(0, 4000);
+                                    }
+
+                                    // Handle image URL
+                                    if (book.imageLinks) {
+                                        const imageUrl = (book.imageLinks.thumbnail || book.imageLinks.smallThumbnail || '').substring(0, 255);
+                                        if (imageUrl) {
+                                            document.getElementById('modalBookImage').value = imageUrl;
+                                            document.getElementById('modalBookThumbnail').src = imageUrl;
+                                        }
+                                    }
+
+
+                                    // Update categories using subject trigger matching
+                                    if (book.categories && book.categories.length > 0) {
+                                        try {
+                                            // Call backend to match categories using subject_triggers
+                                            const categoryResponse = await fetch('/admin/books/match-categories', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Accept': 'application/json'
+                                                },
+                                                body: JSON.stringify({
+                                                    subjects: book.categories
+                                                })
+                                            });
+
+                                            const categoryData = await categoryResponse.json();
+
+                                            if (categoryData.success && categoryData.categoryIds) {
+                                                // Uncheck all first
+                                                document.querySelectorAll('.category-checkbox').forEach(cb => cb.checked = false);
+
+                                                // Check matched categories
+                                                categoryData.categoryIds.forEach(catId => {
+                                                    const checkbox = document.querySelector(`.category-checkbox[value="${catId}"]`);
+                                                    if (checkbox) checkbox.checked = true;
+                                                });
+                                            }
+                                        } catch (catErr) {
+                                            console.warn('Category matching error:', catErr);
+                                        }
+                                    }
+
+
+                                    alert('Data fetched successfully! Review the fields and click "Update Book" to save.');
+                                } else {
+                                    alert('No data found for this ISBN in Google Books API.');
+                                }
+                            } catch (err) {
+                                console.error('Google API Error:', err);
+                                alert('Error fetching data: ' + err.message);
+                            } finally {
+                                // Re-enable button
+                                btn.disabled = false;
+                                btn.innerHTML = originalHTML;
+                            }
+                        });
+
 
                         // --- Delete Logic ---
                         btnDelete.addEventListener('click', async function () {

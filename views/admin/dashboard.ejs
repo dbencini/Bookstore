@@ -2,7 +2,7 @@
     <h1 class="mb-4">Admin Dashboard</h1>
 
     <div class="row">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card text-white bg-primary mb-3">
                 <div class="card-header text-white-50">Total Users</div>
                 <div class="card-body">
@@ -12,17 +12,29 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card text-white bg-success mb-3">
-                <div class="card-header text-white-50">Total Books</div>
+                <div class="card-header text-white-50">Visible Books</div>
                 <div class="card-body">
                     <h5 class="card-title display-4">
-                        <%= bookCount %>
+                        <%= visibleBookCount.toLocaleString() %>
                     </h5>
+                    <p class="card-text small">Public-facing catalog</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-info mb-3">
+                <div class="card-header text-white-50">Total Books</div>
+                <div class="card-body">
+                    <h5 class="card-title display-4">
+                        <%= totalBookCount.toLocaleString() %>
+                    </h5>
+                    <p class="card-text small">Including hidden</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
             <div class="card text-dark bg-warning mb-3">
                 <div class="card-header text-dark-50">Admin Users</div>
                 <div class="card-body">

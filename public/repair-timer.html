@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Author Repair Timer</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            min-width: 400px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin: 0 0 10px 0;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin: 0 0 30px 0;
+            font-size: 16px;
+        }
+
+        .timer {
+            font-size: 72px;
+            font-weight: bold;
+            color: #333;
+            margin: 30px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .target {
+            background: #f0f4ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .target-time {
+            font-size: 24px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .status {
+            font-size: 18px;
+            color: #666;
+            margin-top: 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 1s linear;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📚 Author Repair Progress</h1>
+        <p class="subtitle">Phase 1: Reading OpenLibraryBooks.txt</p>
+
+        <div class="timer" id="timer">00:00:00</div>
+
+        <div class="target">
+            <div>Target Time</div>
+            <div class="target-time">20-30 minutes</div>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+
+        <div class="status" id="status">Processing...</div>
+    </div>
+
+    <script>
+        const startTime = Date.now();
+        const targetMin = 20 * 60 * 1000; // 20 minutes in ms
+        const targetMax = 30 * 60 * 1000; // 30 minutes in ms
+
+        function updateTimer() {
+            const elapsed = Date.now() - startTime;
+
+            // Format time
+            const totalSeconds = Math.floor(elapsed / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            const timeStr =
+                String(hours).padStart(2, '0') + ':' +
+                String(minutes).padStart(2, '0') + ':' +
+                String(seconds).padStart(2, '0');
+
+            document.getElementById('timer').textContent = timeStr;
+
+            // Update progress (based on 25 minute average)
+            const avgTarget = (targetMin + targetMax) / 2;
+            const progress = Math.min(100, (elapsed / avgTarget) * 100);
+            document.getElementById('progress').style.width = progress + '%';
+
+            // Update status
+            const statusEl = document.getElementById('status');
+            if (elapsed < targetMin) {
+                statusEl.textContent = '⏳ On track...';
+                statusEl.style.color = '#4ade80';
+            } else if (elapsed < targetMax) {
+                statusEl.textContent = '⏱️ Almost there...';
+                statusEl.style.color = '#fbbf24';
+            } else {
+                statusEl.textContent = '✅ Should be complete soon!';
+                statusEl.style.color = '#667eea';
+            }
+        }
+
+        // Update every second
+        setInterval(updateTimer, 1000);
+        updateTimer();
+    </script>
+</body>
+
+</html>
