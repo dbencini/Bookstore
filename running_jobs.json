@@ -1,0 +1,182 @@
+[
+  {
+    "id": "09b1bc9d-1008-434b-871d-b1cd4036c758",
+    "status": "failed",
+    "progress": 60,
+    "summary": "Error: Cannot read properties of undefined (reading 'get')",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T10:55:08.000Z",
+    "updatedAt": "2026-02-10T10:56:27.000Z"
+  },
+  {
+    "id": "5d97ab68-6ca2-4c51-9e08-844e17a76b87",
+    "status": "failed",
+    "progress": 50,
+    "summary": "Error: offset is not defined",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T10:25:31.000Z",
+    "updatedAt": "2026-02-10T10:27:06.000Z"
+  },
+  {
+    "id": "0a18f7d3-f5ce-4b63-9d98-6e2c73bcdb31",
+    "status": "running",
+    "progress": 5,
+    "summary": "Phase 1/3: Reading OpenLibraryAuthors.txt (7.6M authors) - This will take approximately 10-15 minutes",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T10:20:08.000Z",
+    "updatedAt": "2026-02-10T10:20:08.000Z"
+  },
+  {
+    "id": "ffc08662-dce9-48de-99db-c9c4b5a43377",
+    "status": "running",
+    "progress": 0,
+    "summary": "Phase 3/3: Updated 59 193 books",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T09:41:16.000Z",
+    "updatedAt": "2026-02-10T10:19:45.000Z"
+  },
+  {
+    "id": "1fb82cf1-f365-4f83-8257-59106c5971fd",
+    "status": "failed",
+    "progress": 50,
+    "summary": "Error: Data truncated for column 'last_book_id' at row 1",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T08:52:25.000Z",
+    "updatedAt": "2026-02-10T09:10:40.000Z"
+  },
+  {
+    "id": "2bf319f7-5161-45c5-92c1-f752e426ad9c",
+    "status": "failed",
+    "progress": 5,
+    "summary": "Error: Deadlock found when trying to get lock; try restarting transaction",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T08:52:06.000Z",
+    "updatedAt": "2026-02-10T08:52:25.000Z"
+  },
+  {
+    "id": "86500ecc-720c-4c42-9309-4a05686a8496",
+    "status": "running",
+    "progress": 5,
+    "summary": "Phase 1/3: Reading OpenLibraryAuthors.txt (7.6M authors) - This will take approximately 10-15 minutes",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T08:49:09.000Z",
+    "updatedAt": "2026-02-10T08:49:09.000Z"
+  },
+  {
+    "id": "ba365b7e-1d1a-41ed-a5a0-eddcf0a1f249",
+    "status": "running",
+    "progress": 5,
+    "summary": "Phase 1/3: Reading OpenLibraryBooks.txt (55M records) - This will take approximately 20-30 minutes",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T06:47:18.000Z",
+    "updatedAt": "2026-02-10T06:47:18.000Z"
+  },
+  {
+    "id": "26ca6883-26be-49ce-9759-055a8673fbe8",
+    "status": "running",
+    "progress": 5,
+    "summary": "Phase 1/3: Building ISBN mapping table from dump file...",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T06:33:24.000Z",
+    "updatedAt": "2026-02-10T06:33:24.000Z"
+  },
+  {
+    "id": "8c4b291b-8fd4-42be-89e6-2e4359390851",
+    "status": "running",
+    "progress": 5,
+    "summary": "Phase 1/3: Building ISBN mapping table from dump file...",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T06:16:51.000Z",
+    "updatedAt": "2026-02-10T06:16:51.000Z"
+  },
+  {
+    "id": "c9f75f5e-2646-4417-91b7-031209cf8c57",
+    "status": "running",
+    "progress": 5,
+    "summary": "Phase 1/3: Building ISBN mapping table from dump file...",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T06:11:28.000Z",
+    "updatedAt": "2026-02-10T06:11:28.000Z"
+  },
+  {
+    "id": "a41294d7-5645-4135-89dc-52c16b5b20ce",
+    "status": "running",
+    "progress": 5,
+    "summary": "Phase 1/3: Building ISBN mapping table from dump file...",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T05:23:02.000Z",
+    "updatedAt": "2026-02-10T05:23:02.000Z"
+  },
+  {
+    "id": "8461b06a-f894-4b9b-865a-8aaeef440368",
+    "status": "failed",
+    "progress": 5,
+    "summary": "Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OR IGNORE INTO isbn_author_mappings (isbn, author_keys)\n        VALUES ('9780108' at line 1",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T05:21:00.000Z",
+    "updatedAt": "2026-02-10T05:21:00.000Z"
+  },
+  {
+    "id": "f45c1e3d-7dbb-4505-aa71-e1134c2ed0a1",
+    "status": "failed",
+    "progress": 0,
+    "summary": "Error: Table 'bookstore.repair_checkpoints' doesn't exist",
+    "type": "author_repair_stable",
+    "createdAt": "2026-02-10T05:15:42.000Z",
+    "updatedAt": "2026-02-10T05:15:42.000Z"
+  },
+  {
+    "id": "d07ae8c1-98f4-47e6-b962-b00525a60588",
+    "status": "running",
+    "progress": 50,
+    "summary": "Step 4/4: Updating database with resolved author names...",
+    "type": "author_repair_local",
+    "createdAt": "2026-02-10T01:00:38.000Z",
+    "updatedAt": "2026-02-10T01:22:06.000Z"
+  },
+  {
+    "id": "d97bd657-6d67-4a77-ab9d-3a979ee844a9",
+    "status": "running",
+    "progress": 41,
+    "summary": "Step 3/4: Scanned 10 106 434 records, MAPPED 5 900 000 with authors!",
+    "type": "author_repair_local",
+    "createdAt": "2026-02-09T21:30:08.000Z",
+    "updatedAt": "2026-02-09T21:40:38.000Z"
+  },
+  {
+    "id": "7f5b1856-f50c-48c7-9e6d-70aff2205410",
+    "status": "running",
+    "progress": 45,
+    "summary": "Step 3/4: Scanned 18 480 412 records, MAPPED 10 800 000 with authors!",
+    "type": "author_repair_local",
+    "createdAt": "2026-02-09T21:28:27.000Z",
+    "updatedAt": "2026-02-09T21:40:39.000Z"
+  },
+  {
+    "id": "0ad82a7c-8fb3-46c7-b162-960642d00313",
+    "status": "running",
+    "progress": 41,
+    "summary": "Step 3/4: Scanned 10 050 000 book records, mapped 5 862 741 with authors.",
+    "type": "author_repair_local",
+    "createdAt": "2026-02-09T21:20:08.000Z",
+    "updatedAt": "2026-02-09T21:23:26.000Z"
+  },
+  {
+    "id": "9ab1418c-22e7-48d1-8f3a-ac47f489fad3",
+    "status": "running",
+    "progress": 45,
+    "summary": "Step 3/4: Scanned 21 600 000 book records, mapped 12 611 082 with authors.",
+    "type": "author_repair_local",
+    "createdAt": "2026-02-09T21:11:53.000Z",
+    "updatedAt": "2026-02-09T21:18:09.000Z"
+  },
+  {
+    "id": "89c45385-889e-4129-8a2a-7a9d05025fe8",
+    "status": "running",
+    "progress": 36,
+    "summary": "Step 3/4: Scanned 5 450 000 book records, mapped 3 185 464 with authors.",
+    "type": "author_repair_local",
+    "createdAt": "2026-02-09T21:06:31.000Z",
+    "updatedAt": "2026-02-09T21:08:45.000Z"
+  }
+]

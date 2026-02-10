@@ -14,6 +14,8 @@ const FooterSetting = require('./FooterSetting');
 const OrderItem = require('./OrderItem');
 const Workshop = require('./Workshop');
 const OrderSource = require('./OrderSource');
+const OpenLibraryAuthor = require('./OpenLibraryAuthor');
+const IsbnAuthorMapping = require('./IsbnAuthorMapping');
 
 
 // CloudPrinter Models
@@ -108,5 +110,7 @@ module.exports = {
     CpAddress,
     CpFile,
     CpSignal,
+    OpenLibraryAuthor,
+    IsbnAuthorMapping,
     Op
 };

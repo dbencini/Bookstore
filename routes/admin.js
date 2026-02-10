@@ -30,6 +30,7 @@ const { sequelize, User, UserType, Book, Category, Job, FooterSetting, Order, Or
 // Middleware Imports
 const requireAdmin = require('../middleware/adminAuth');
 const { fetchGoogleBooks, fixBookData, fastAuthorRepair, importBooksFromCSV, importManualZip, stopJob, pauseJob, resumeJob } = require('../services/bookService');
+const { repairAuthorsStable, stopJob: stopStableJob, pauseJob: pauseStableJob, resumeJob: resumeStableJob } = require('../repair_authors_stable');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
@@ -611,17 +612,41 @@ router.get('/api/jobs/:id/status', async (req, res) => {
     try {
         const job = await Job.findByPk(req.params.id);
         if (!job) return res.status(404).json({ error: 'Job not found' });
+
+        let status = job.status;
+        const STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+
+        // Check for stale "running" jobs
+        if (status === 'running' && (Date.now() - new Date(job.updatedAt).getTime() > STALE_THRESHOLD)) {
+            status = 'stalled';
+        }
+
         res.json({
-            status: job.status,
+            status: status,
             progress: job.progress || 0,
             summary: job.summary,
             booksAdded: job.booksAdded,
             startTime: job.startTime,
+            updatedAt: job.updatedAt,
             type: job.type,
             fixedCount: job.fixedCount
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/api/master-author-stats', async (req, res) => {
+    try {
+        const { OpenLibraryAuthor, IsbnAuthorMapping } = require('../models');
+        const [authorCount, mappingCount] = await Promise.all([
+            OpenLibraryAuthor.count(),
+            IsbnAuthorMapping.count()
+        ]);
+        res.json({ success: true, authorCount, mappingCount });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -640,8 +665,17 @@ router.post('/jobs/fix-data', async (req, res) => {
 
 router.post('/jobs/:id/stop', async (req, res) => {
     try {
-        const result = await stopJob(req.params.id);
-        if (result.success) {
+        let result = await stopJob(req.params.id);
+
+        // If not successful/found in BookService, try Stable Repair
+        if (!result || !result.success) {
+            const stableResult = await stopStableJob(req.params.id);
+            if (stableResult && stableResult.success) {
+                result = stableResult;
+            }
+        }
+
+        if (result && result.success) {
             // Wait briefly for the loop to break
             await new Promise(r => setTimeout(r, 600));
         }
@@ -764,44 +798,65 @@ router.post('/import/check-hidden-books', async (req, res) => {
     try {
         console.log('[Admin] Checking hidden books for visibility eligibility...');
 
-        // Get all hidden books
-        const hiddenBooks = await Book.findAll({
-            where: { isVisible: false }
-        });
-
-        let checked = hiddenBooks.length;
+        let checked = 0;
         let updated = 0;
         let pricesFixed = 0;
+        let lastId = '00000000-0000-0000-0000-000000000000';
+        const BATCH_SIZE = 1000;
 
-        for (const book of hiddenBooks) {
-            let needsSave = false;
+        while (true) {
+            // Fetch batch using cursor pagination to avoid OOM
+            const hiddenBooks = await Book.findAll({
+                where: {
+                    isVisible: false,
+                    id: { [Op.gt]: lastId }
+                },
+                order: [['id', 'ASC']],
+                limit: BATCH_SIZE,
+                attributes: ['id', 'title', 'author', 'price', 'price_cost', 'imageUrl', 'isVisible']
+            });
 
-            // Check if price is missing but cost_price exists
-            if ((!book.price || book.price === 0) && book.price_cost && book.price_cost > 0) {
-                book.price = (book.price_cost * 1.15).toFixed(2);
-                pricesFixed++;
-                needsSave = true;
+            if (hiddenBooks.length === 0) break;
+
+            for (const book of hiddenBooks) {
+                checked++;
+                let needsSave = false;
+
+                // Check if price is missing but cost_price exists
+                if ((!book.price || parseFloat(book.price) === 0) && book.price_cost && parseFloat(book.price_cost) > 0) {
+                    book.price = (parseFloat(book.price_cost) * 1.15).toFixed(2);
+                    pricesFixed++;
+                    needsSave = true;
+                }
+
+                // Check if book qualifies for visibility
+                const hasImage = book.imageUrl &&
+                    book.imageUrl !== '' &&
+                    !book.imageUrl.includes('placeholder');
+                const hasAuthor = book.author &&
+                    book.author !== '' &&
+                    book.author !== 'Unknown';
+                const hasTitle = book.title && book.title !== '';
+                const hasPrice = book.price && parseFloat(book.price) > 0;
+
+                // Make visible if all criteria met
+                if (hasImage && hasAuthor && hasTitle && hasPrice) {
+                    book.isVisible = true;
+                    updated++;
+                    needsSave = true;
+                }
+
+                if (needsSave) {
+                    await book.save();
+                }
+
+                lastId = book.id;
             }
 
-            // Check if book qualifies for visibility
-            const hasImage = book.imageUrl &&
-                book.imageUrl !== '' &&
-                !book.imageUrl.includes('placeholder');
-            const hasAuthor = book.author &&
-                book.author !== '' &&
-                book.author !== 'Unknown';
-            const hasTitle = book.title && book.title !== '';
-            const hasPrice = book.price && book.price > 0;
-
-            // Make visible if all criteria met
-            if (hasImage && hasAuthor && hasTitle && hasPrice) {
-                book.isVisible = true;
-                updated++;
-                needsSave = true;
-            }
-
-            if (needsSave) {
-                await book.save();
+            // Optional: Log progress every 10 batches
+            if (checked % 10000 === 0) {
+                console.log(`[Admin] Checked ${checked} hidden books...`);
+                if (global.gc) global.gc(); // Hint GC if exposed
             }
         }
 
@@ -1511,6 +1566,57 @@ router.get('/repair/google-huge-file/sample', async (req, res) => {
         fileStream.destroy();
 
         res.json({ success: true, rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Fast Author Repair (Local Dump - Stable)
+router.post('/import/fast-author-repair', async (req, res) => {
+    try {
+        // Run in background
+        repairAuthorsStable().catch(err => console.error(err));
+        // Small delay to allow job creation
+        await new Promise(r => setTimeout(r, 1000));
+        res.redirect('/admin/import?success=AuthorRepairStarted');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/import?error=RepairFailed');
+    }
+});
+
+// Repair Stats (JSON)
+router.get('/repair/stats', async (req, res) => {
+    try {
+        const [total, hasAuthor, hasDesc, hasThumb, hasCost, hasSale, categories] = await Promise.all([
+            Book.count(),
+            Book.count({ where: { author: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }, { [Op.ne]: 'Unknown' }] } } }),
+            Book.count({ where: { description: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }, { [Op.ne]: 'No description available.' }] } } }),
+            Book.count({ where: { imageUrl: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }, { [Op.ne]: '/images/placeholder-book.png' }, { [Op.ne]: 'https://placehold.co/200x300' }] } } }),
+            Book.count({ where: { price_cost: { [Op.gt]: 0 } } }),
+            Book.count({ where: { price: { [Op.gt]: 0 } } }),
+            Category.findAll({
+                attributes: ['id', 'name', 'book_count'],
+                order: [['book_count', 'DESC']]
+            })
+        ]);
+
+        res.json({
+            success: true,
+            stats: {
+                total,
+                hasAuthor,
+                hasDesc,
+                hasThumb,
+                hasCost,
+                hasSale,
+                missingAuthor: total - hasAuthor,
+                missingDesc: total - hasDesc,
+                missingThumb: total - hasThumb
+            },
+            categories: categories.map(c => ({ name: c.name, count: c.book_count || 0 }))
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, error: err.message });

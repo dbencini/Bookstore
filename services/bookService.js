@@ -15,6 +15,23 @@ const GOOGLE_BOOKS_API_URL = 'https://www.googleapis.com/books/v1/volumes';
 // Track active jobs for cancellation
 const activeJobs = new Set();
 
+async function axiosWithRetry(url, config, retries = 3, delay = 2000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await axios.get(url, config);
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            if (err.response && err.response.status === 429) {
+                console.warn(`[BookService] Rate limited (429). Retrying in ${delay * 2}ms...`);
+                await new Promise(r => setTimeout(r, delay * 2));
+            } else {
+                console.warn(`[BookService] Request failed (${err.message}). Retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
+            }
+        }
+    }
+}
+
 function cancelJob(jobId) {
     if (activeJobs.has(jobId)) {
         activeJobs.delete(jobId);
@@ -382,6 +399,26 @@ async function processDataRepairBackground(job) {
                     // Item Delay: 3s between individual calls
                     await new Promise(r => setTimeout(r, 3000));
 
+                    // MASTER AUTHOR ENRICHMENT: Try local lookup first
+                    const cleanIsbnForMaster = book.isbn.replace(/[-\s]/g, '');
+                    const { IsbnAuthorMapping, OpenLibraryAuthor } = require('../models');
+                    try {
+                        const mapping = await IsbnAuthorMapping.findOne({ where: { isbn: cleanIsbnForMaster } });
+                        if (mapping) {
+                            const authorKeys = mapping.author_keys.split(',').map(k => k.replace('/authors/', ''));
+                            const authors = await OpenLibraryAuthor.findAll({
+                                where: { author_id: { [Op.in]: authorKeys } }
+                            });
+                            const names = authors.map(a => a.name).filter(Boolean);
+                            if (names.length > 0) {
+                                book.author = names.join(', ');
+                                console.log(`[BookService] [Priority] Found author in Master DB for ISBN ${book.isbn}: ${book.author}`);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`[BookService] Master Author lookup failed for ISBN ${book.isbn}:`, e.message);
+                    }
+
                     const query = `isbn:${book.isbn}`;
                     const response = await axiosWithRetry(GOOGLE_BOOKS_API_URL, {
                         params: {
@@ -696,6 +733,7 @@ async function processBatch(rows, job, markup) {
 
     // 2. Pre-fetch Existing Books in this batch
     const isbns = rows.map(r => r.isbn || r.code || r.id || r.barcode).filter(Boolean);
+    const cleanIsbns = isbns.map(isbn => isbn.replace(/[-\s]/g, ''));
     const titles = rows.map(r => r.title || r.heading || r.name || r.item || r.book).filter(Boolean);
 
     const existingBooks = await Book.findAll({
@@ -714,7 +752,39 @@ async function processBatch(rows, job, markup) {
         existingMap.set(`title:${b.title}`, b.id);
     });
 
-    // 3. Process Batch in Transaction
+    // 3. MASTER AUTHOR ENRICHMENT: Pre-fetch any "Unknown" authors from our DB
+    const { IsbnAuthorMapping, OpenLibraryAuthor } = require('../models');
+    const masterAuthorMap = new Map();
+    if (cleanIsbns.length > 0) {
+        const mappings = await IsbnAuthorMapping.findAll({
+            where: { isbn: { [Op.in]: cleanIsbns } }
+        });
+
+        if (mappings.length > 0) {
+            const allAuthorKeys = new Set();
+            mappings.forEach(m => {
+                m.author_keys.split(',').forEach(key => allAuthorKeys.add(key.replace('/authors/', '')));
+            });
+
+            const authors = await OpenLibraryAuthor.findAll({
+                where: { author_id: { [Op.in]: Array.from(allAuthorKeys) } }
+            });
+
+            const nameMap = new Map();
+            authors.forEach(a => nameMap.set(a.author_id, a.name));
+
+            mappings.forEach(m => {
+                const names = m.author_keys.split(',')
+                    .map(key => nameMap.get(key.replace('/authors/', '')))
+                    .filter(Boolean);
+                if (names.length > 0) {
+                    masterAuthorMap.set(m.isbn, names.join(', '));
+                }
+            });
+        }
+    }
+
+    // 4. Process Batch in Transaction
     await sequelize.transaction(async (t) => {
         for (const row of rows) {
             const title = row.title || row.heading || row.name || row.item || row.book;
@@ -729,21 +799,29 @@ async function processBatch(rows, job, markup) {
             const cost = parseFloat(costVal) || 0;
             const finalPrice = cost * (1 + parseFloat(markup) / 100);
 
+            let author = (row.author || 'Unknown').substring(0, 2000);
+            const cleanIsbn = isbn ? isbn.replace(/[-\s]/g, '') : null;
+
+            // Master Author Enrichment
+            if ((author === 'Unknown' || author === '') && cleanIsbn && masterAuthorMap.has(cleanIsbn)) {
+                author = masterAuthorMap.get(cleanIsbn);
+            }
+
             const bookData = {
                 title: (title || 'Unknown Title').substring(0, 255),
-                author: (row.author || 'Unknown').substring(0, 2000),
+                author: author,
                 description: (row.description || row.summary || 'No description available.').substring(0, 4000),
                 price: finalPrice || 19.99,
                 price_cost: cost,
                 imageUrl: (row.imageurl || row.image || '/images/default_cover.svg').substring(0, 255),
                 isbn: isbn || null,
-                status: status || 'ready', // Default to ready if we got this far
+                status: status || 'ready',
                 bind: row.bind || null,
                 pur: row.pur || row.bind || null,
                 isVisible: (
                     (row.description || row.summary || 'No description available.') !== 'No description available.' &&
-                    (row.author || 'Unknown') !== 'Unknown' &&
-                    (row.author || 'Unknown').trim() !== ''
+                    author !== 'Unknown' &&
+                    author.trim() !== ''
                 ),
                 JobId: job.id
             };
@@ -990,13 +1068,15 @@ async function runUltimateRepair(job) {
 
         let lineCount = 0;
         let batchUpdates = [];
+        let batchMappings = [];
+        let batchAuthors = [];
 
         fileStream.on('data', (chunk) => {
             bytesRead += chunk.length;
             if (lineCount % 20000 === 0) {
                 const p = 10 + Math.floor((bytesRead / totalBytes) * 90);
                 job.progress = p;
-                job.summary = `Scanned ${lineCount.toLocaleString()} records. Found ${fixedCount.toLocaleString()} matches. (${p}% of file)`;
+                job.summary = `Scanned ${lineCount.toLocaleString()} OL records. Found ${fixedCount.toLocaleString()} matches. (${p}% of file)`;
                 job.save().catch(() => { });
             }
         });
@@ -1013,12 +1093,27 @@ async function runUltimateRepair(job) {
 
             try {
                 const data = JSON.parse(parts[4]);
-                const isbns = [];
-                if (data.isbn_13) isbns.push(...data.isbn_13);
-                if (data.isbn_10) isbns.push(...data.isbn_10);
+                const isbnList = [];
+                if (data.isbn_13) isbnList.push(...data.isbn_13);
+                if (data.isbn_10) isbnList.push(...data.isbn_10);
+
+                if (isbnList.length > 0 && data.authors && data.authors.length > 0) {
+                    const authorKeys = data.authors.map(a => a.key).filter(Boolean).join(',');
+                    if (authorKeys) {
+                        isbnList.forEach(isbn => {
+                            batchMappings.push({ isbn: isbn.replace(/[-\s]/g, ''), author_keys: authorKeys });
+                        });
+                    }
+                }
+
+                // If we have a by_statement and author keys, we can potentially "learn" an author name
+                if (data.by_statement && data.authors && data.authors.length === 1) {
+                    const authorId = data.authors[0].key.replace('/authors/', '');
+                    batchAuthors.push({ author_id: authorId, name: data.by_statement });
+                }
 
                 let match = null;
-                for (let isbn of isbns) {
+                for (let isbn of isbnList) {
                     const clean = isbn.replace(/[-\s]/g, '');
                     if (isbnMap.has(clean)) {
                         match = isbnMap.get(clean);
@@ -1039,25 +1134,16 @@ async function runUltimateRepair(job) {
                         }
                     }
 
-                    // Authors Matching (Requires another lookup usually, but some editions have literals or we can extract from keys)
-                    // For now, let's look for 'authors' in the blob if they are simple strings
-                    if (match.needsAuthor && data.authors && data.authors.length > 0) {
-                        // In OL, authors are often just keys, but sometimes names are present in 'author_name' on other records
-                        // However, let's see if we can get anything useful.
-                        // Actually, Open Library dump for editions doesn't typically have the name, just the key.
-                        // We will skip author name repair from OL dump for now to keep it high-accuracy,
-                        // unless we find 'by_statement' or similar.
-                        if (data.by_statement) {
-                            updateData.author = data.by_statement;
-                            updated = true;
-                        }
+                    // Authors Matching
+                    if (match.needsAuthor && data.by_statement) {
+                        updateData.author = data.by_statement;
+                        updated = true;
                     }
 
                     // Image Matching
                     if (match.needsImage) {
                         let finalImageUrl = null;
                         if (data.covers && data.covers.length > 0) {
-                            // Direct Cover ID Pattern
                             const coverId = data.covers[0];
                             if (coverId > 0) {
                                 finalImageUrl = `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`;
@@ -1065,7 +1151,6 @@ async function runUltimateRepair(job) {
                         }
 
                         if (!finalImageUrl && match.isbn) {
-                            // Fallback to ISBN Pattern
                             finalImageUrl = `https://covers.openlibrary.org/b/isbn/${match.isbn}-L.jpg`;
                         }
 
@@ -1077,8 +1162,7 @@ async function runUltimateRepair(job) {
 
                     // Subjects (Categories) Enrichment
                     if (data.subjects && data.subjects.length > 0) {
-                        // We store subjects in updateData to be processed by processBatchUpdates
-                        updateData.subjects = data.subjects.slice(0, 10); // Limit to top 10 subjects
+                        updateData.subjects = data.subjects.slice(0, 10);
                         updated = true;
                     }
 
@@ -1088,11 +1172,12 @@ async function runUltimateRepair(job) {
                 }
             } catch (e) { /* ignore parse errors */ }
 
-            if (batchUpdates.length >= 100) {
-                fixedCount += await processBatchUpdates(batchUpdates);
+            if (batchUpdates.length >= 100 || batchMappings.length >= 500) {
+                fixedCount += await processBatchUpdates(batchUpdates, batchMappings, batchAuthors);
                 batchUpdates = [];
+                batchMappings = [];
+                batchAuthors = [];
 
-                // Update Progress every 20,000 scanned lines
                 if (lineCount % 20000 === 0) {
                     job.summary = `Scanned ${lineCount.toLocaleString()} OL records. Found ${fixedCount.toLocaleString()} matches.`;
                     await job.save();
@@ -1101,8 +1186,8 @@ async function runUltimateRepair(job) {
         }
 
         // Final Batch
-        if (batchUpdates.length > 0) {
-            fixedCount += await processBatchUpdates(batchUpdates);
+        if (batchUpdates.length > 0 || batchMappings.length > 0) {
+            fixedCount += await processBatchUpdates(batchUpdates, batchMappings, batchAuthors);
         }
 
         job.status = 'completed';
@@ -1231,9 +1316,10 @@ async function downloadOpenLibraryDump(url, dest, job) {
     }
 }
 
-async function processBatchUpdates(updates) {
+async function processBatchUpdates(updates, mappings = [], authors = []) {
     let count = 0;
     const subjectsToEnsure = new Set();
+    const { OpenLibraryAuthor, IsbnAuthorMapping } = require('../models');
 
     // 1. Collect and clean all subjects across the batch for pre-creation
     for (const item of updates) {
@@ -1241,7 +1327,6 @@ async function processBatchUpdates(updates) {
             const cleanedSubjects = [];
             item.subjects.forEach(s => {
                 if (!s) return;
-                // Open Library often packs multiple subjects into one semicolon-delimited string
                 const parts = s.split(';').map(p => p.trim()).filter(Boolean);
                 parts.forEach(p => {
                     const truncated = p.substring(0, 255);
@@ -1249,7 +1334,7 @@ async function processBatchUpdates(updates) {
                     cleanedSubjects.push(truncated);
                 });
             });
-            item.subjects = cleanedSubjects; // Re-assign cleaned list for step 3
+            item.subjects = cleanedSubjects;
         }
     }
 
@@ -1264,18 +1349,36 @@ async function processBatchUpdates(updates) {
 
     // 3. Apply updates in Transaction
     await sequelize.transaction(async (t) => {
+        // A. Upsert Mappings (Growing the Master Table)
+        if (mappings.length > 0) {
+            const mappingValues = mappings.map(m => `(${sequelize.escape(m.isbn)}, ${sequelize.escape(m.author_keys)})`).join(',');
+            await sequelize.query(`
+                INSERT INTO isbn_author_mappings (isbn, author_keys) 
+                VALUES ${mappingValues}
+                ON DUPLICATE KEY UPDATE author_keys = VALUES(author_keys), updatedAt = NOW()
+            `, { transaction: t, logging: false });
+        }
+
+        // B. Upsert Authors (Growing the Master Table)
+        if (authors.length > 0) {
+            const authorValues = authors.map(a => `(${sequelize.escape(a.author_id)}, ${sequelize.escape(a.name)})`).join(',');
+            await sequelize.query(`
+                INSERT INTO open_library_authors (author_id, name) 
+                VALUES ${authorValues}
+                ON DUPLICATE KEY UPDATE name = VALUES(name), updatedAt = NOW()
+            `, { transaction: t, logging: false });
+        }
+
+        // C. Update Individual Books
         for (const item of updates) {
             const { id, subjects, ...bookData } = item;
 
-            // Defensive Truncation for metadata
             if (bookData.title) bookData.title = bookData.title.substring(0, 255);
             if (bookData.author) bookData.author = bookData.author.substring(0, 255);
             if (bookData.imageUrl) bookData.imageUrl = bookData.imageUrl.substring(0, 255);
             if (bookData.description) bookData.description = bookData.description.substring(0, 4000);
 
-            // Update Book fields (Title, Author, Desc etc)
             if (Object.keys(bookData).length > 0) {
-                // Enforce visibility
                 const hasDescription = bookData.description && bookData.description.trim() !== '' && bookData.description !== 'No description available.';
                 const hasAuthor = bookData.author && bookData.author !== 'Unknown' && bookData.author.trim() !== '';
 
@@ -1288,16 +1391,14 @@ async function processBatchUpdates(updates) {
                 await Book.update(bookData, { where: { id }, transaction: t });
             }
 
-            // Update Many-to-Many Categories
             if (subjects && subjects.length > 0) {
                 const categoryIds = subjects.map(s => categoryMap[s]).filter(Boolean);
                 if (categoryIds.length > 0) {
-                    // Optimized sync: Insert associations, ignore duplicates
-                    const mappings = categoryIds.map(catId => ({
+                    const links = categoryIds.map(catId => ({
                         BookId: id,
                         CategoryId: catId
                     }));
-                    await BookCategory.bulkCreate(mappings, {
+                    await BookCategory.bulkCreate(links, {
                         transaction: t,
                         ignoreDuplicates: true
                     });
