@@ -10,6 +10,8 @@ const { sequelize, User, UserType, SiteConfig, Category, FooterSetting } = requi
 const expressLayouts = require('express-ejs-layouts');
 const adminRoutes = require('./routes/admin');
 const { fetchGoogleBooks } = require('./services/bookService');
+const cron = require('node-cron');
+const { exec } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -221,8 +223,7 @@ app.listen(PORT, async () => {
     console.log(`Debug URL: http://localhost:${PORT}/?cb=${Date.now()}`);
 
     // Schedule Daily Bestseller Sync (At midnight)
-    const cron = require('node-cron');
-    const { exec } = require('child_process');
+    // Schedule Daily Bestseller Sync (At midnight)
     cron.schedule('0 0 * * *', () => {
         console.log('[Cron] Running daily bestseller sync...');
         exec('node scripts/fetch_bestsellers.js', (error, stdout, stderr) => {

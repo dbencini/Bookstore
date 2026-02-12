@@ -306,12 +306,47 @@ router.get('/books', async (req, res) => {
 
         if (isSearching) {
             // Admin can see ALL books - no visibility filtering
-            if (title) where.title = { [Op.like]: `%${title}%` };
-            if (author) where.author = { [Op.like]: `%${author}%` };
+
+            // Full-Text Search Implementation
+            const formatFtsQuery = (q) => {
+                if (!q) return null;
+                // Standard stopword list provided by MySQL (InnoDb)
+                const stopwords = new Set(['the', 'and', 'for', 'with', 'about', 'from', 'that', 'this', 'was', 'are', 'not', 'but', 'of', 'a', 'an', 'to']);
+                const rawTerms = q.trim().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(t => t.length > 0);
+
+                if (rawTerms.length === 0) return null;
+
+                const query = rawTerms.map(t => {
+                    const lower = t.toLowerCase();
+                    // Only make terms mandatory if they are likely significant
+                    if (lower.length < 3 || stopwords.has(lower)) return `${t}*`;
+                    return `+${t}*`;
+                }).join(' ');
+
+                return query;
+            };
+
+            if (title) {
+                const ftsQuery = formatFtsQuery(title);
+                if (ftsQuery) {
+                    if (!where[Op.and]) where[Op.and] = [];
+                    where[Op.and].push(sequelize.literal(`MATCH (title) AGAINST (${sequelize.escape(ftsQuery)} IN BOOLEAN MODE)`));
+                }
+            }
+
+            if (author) {
+                const ftsQuery = formatFtsQuery(author);
+                if (ftsQuery) {
+                    if (!where[Op.and]) where[Op.and] = [];
+                    where[Op.and].push(sequelize.literal(`MATCH (author) AGAINST (${sequelize.escape(ftsQuery)} IN BOOLEAN MODE)`));
+                }
+            }
+
             if (isbn) {
                 const cleanIsbn = isbn.replace(/[-\s]/g, '');
                 where.isbn = cleanIsbn;
             }
+
 
             // Date Range Search with validation
             if (startDate || endDate) {
@@ -328,9 +363,6 @@ router.get('/books', async (req, res) => {
                         end.setHours(23, 59, 59, 999);
                         dateFilter[Op.lte] = end;
                     }
-                }
-                if (Object.keys(dateFilter).length > 0) {
-                    where.createdAt = dateFilter;
                 }
             }
         }
@@ -385,18 +417,29 @@ router.get('/books', async (req, res) => {
             }
 
             if (!usedCachedCount) {
+                console.time('Admin:Count');
                 count = await Book.count({ where });
+                console.timeEnd('Admin:Count');
             }
 
+            // Performance Fix: Do NOT order by updatedAt if doing a Full-Text Search
+            // Mixing FTS match with Order By causes massive slowdowns (Filesort on large result sets)
+            const isTextSearch = !!(title || author);
+            console.log('Admin:IsTextSearch:', isTextSearch);
+            console.log('Admin:Where:', JSON.stringify(where, null, 2));
+
+            console.time('Admin:FindAll');
             rows = await Book.findAll({
                 where,
                 limit,
                 offset,
-                order: [['updatedAt', 'DESC']]
+                order: isTextSearch ? [] : [['updatedAt', 'DESC']]
             });
+            console.timeEnd('Admin:FindAll');
         }
 
         if (rows.length > 0) {
+            console.time('Admin:Categories');
             const bookIds = rows.map(b => b.id);
             const categoriesForBooks = await Category.findAll({
                 include: [{
@@ -406,6 +449,7 @@ router.get('/books', async (req, res) => {
                     through: { attributes: [] }
                 }]
             });
+            console.timeEnd('Admin:Categories');
 
             const categoryMap = {};
             categoriesForBooks.forEach(cat => {
@@ -421,7 +465,9 @@ router.get('/books', async (req, res) => {
         }
 
         // Fetch all categories for combobox in Edit modal
+        console.time('Admin:TagsDropdown');
         const categories = await Category.findAll({ order: [['name', 'ASC']] });
+        console.timeEnd('Admin:TagsDropdown');
         const totalPages = Math.ceil(count / limit);
 
         res.render('admin/books', {
