@@ -1,0 +1,12 @@
+Book: The Path of the King
+ISBN: 9781023032766
+URL: https://books.google.com/books/content?id=ONRF0QEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api
+---
+Book: Fugitive Pieces
+ISBN: 9781025209074
+URL: https://books.google.com/books/content?id=xo6O0QEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api
+---
+Book: Heart of the Hunter
+ISBN: 9781967169931
+URL: https://books.google.com/books/content?id=qx6L0QEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api
+---

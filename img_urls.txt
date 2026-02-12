@@ -1,0 +1,2 @@
+HOTH: http://books.google.com/books/content?id=-BJcvngpDkcC&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api
+POTK: http://books.google.com/books/content?id=EpJlAwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api
