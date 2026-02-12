@@ -86,11 +86,18 @@ async function performSearch(search, limit, offset) {
     return { books, count: countRes ? countRes.count : 0 };
 }
 
+const enrichmentService = require('../services/enrichmentService');
+
 router.get('/books', async (req, res) => {
-    const { search, category } = req.query;
+    let { search, category } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = 8;
     const offset = (page - 1) * limit;
+
+    // Default to Bestseller category if no search or category is specified
+    if (!search && !category) {
+        category = 'Bestseller';
+    }
 
     let categoryData = null;
     if (category) categoryData = await Category.findOne({ where: { name: category } });
@@ -99,6 +106,8 @@ router.get('/books', async (req, res) => {
     if (homepageCache.has(cacheKey) && !search) {
         const cached = homepageCache.get(cacheKey);
         if (Date.now() - cached.timestamp < HOMEPAGE_CACHE_TTL) {
+            // Trigger background enrichment even on cache hit for the 8 books
+            // enrichmentService.enrichBooks(cached.data.books);
             return res.render('index', { ...cached.data, search, category });
         }
     }
@@ -109,8 +118,8 @@ router.get('/books', async (req, res) => {
             if (categoryData) {
                 count = categoryData.book_count;
                 books = await sequelize.query(`
-                    SELECT b.* FROM books b USE INDEX (books_is_visible_created_at)
-                    STRAIGHT_JOIN book_category bc ON b.id = bc.BookId
+                    SELECT b.* FROM books b
+                    JOIN book_category bc ON b.id = bc.BookId
                     WHERE bc.CategoryId = :categoryId AND b.isVisible = true 
                     ORDER BY b.createdAt DESC LIMIT :limit OFFSET :offset
                 `, {
@@ -132,6 +141,9 @@ router.get('/books', async (req, res) => {
             books = results.books;
             count = results.count;
         }
+
+        // Trigger background enrichment for the 8 visible books
+        // enrichmentService.enrichBooks(books);
 
         const data = { books, currentPage: page, totalPages: Math.ceil(count / limit) };
         if (!search) homepageCache.set(cacheKey, { timestamp: Date.now(), data });

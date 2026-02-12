@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sequelize, Book, Category, BookCategory, Job, Op } = require('./models');
+const { sequelize, Book, Category, BookCategory, Job, Op, OpenLibraryAuthor } = require('./models');
 const fs = require('fs');
 const csv = require('csv-parser');
 const path = require('path');
@@ -277,9 +277,23 @@ async function runRepairPhase(progress) {
                 const updateData = {};
                 let updated = false;
 
-                if (match.needsAuthor && data.by_statement) {
-                    updateData.author = data.by_statement;
-                    updated = true;
+                if (match.needsAuthor) {
+                    // 1. Try to get Author Keys first (High Quality)
+                    if (data.authors && Array.isArray(data.authors)) {
+                        updateData.authorKeys = data.authors
+                            .map(a => a.key ? a.key.replace('/authors/', '') : null)
+                            .filter(k => k);
+                    }
+
+                    // 2. Fallback to by_statement
+                    if (data.by_statement) {
+                        updateData.authorFallback = data.by_statement;
+                    }
+
+                    // We mark as updated if we have EITHER keys or a fallback
+                    if ((updateData.authorKeys && updateData.authorKeys.length > 0) || updateData.authorFallback) {
+                        updated = true;
+                    }
                 }
                 if (match.needsDesc && data.description) {
                     updateData.description = typeof data.description === 'string' ? data.description : data.description.value;
@@ -346,9 +360,45 @@ async function processBatchUpdates(updates) {
     // Fallback: Ensure we have "New Books"
     let [defaultCat] = await Category.findOrCreate({ where: { name: 'New Books' } });
 
+    // --- BATCH AUTHOR RESOLUTION ---
+    // Collect all author keys from the batch
+    const allAuthorKeys = new Set();
+    updates.forEach(u => {
+        if (u.authorKeys) u.authorKeys.forEach(k => allAuthorKeys.add(k));
+    });
+
+    // Fetch names from DB
+    const authorMap = new Map(); // ID -> Name
+    if (allAuthorKeys.size > 0) {
+        const dbAuthors = await OpenLibraryAuthor.findAll({
+            where: { author_id: { [Op.in]: [...allAuthorKeys] } },
+            attributes: ['author_id', 'name'],
+            raw: true
+        });
+        dbAuthors.forEach(a => authorMap.set(a.author_id, a.name));
+    }
+    // -------------------------------
+
     await sequelize.transaction(async (t) => {
         for (const item of updates) {
-            const { id, mappedCategories, ...bookData } = item;
+            const { id, mappedCategories, authorKeys, authorFallback, ...rest } = item;
+            let bookData = { ...rest };
+
+            // Resolve Author Name
+            if (authorKeys && authorKeys.length > 0) {
+                const resolvedNames = authorKeys
+                    .map(k => authorMap.get(k))
+                    .filter(n => n); // Only keep found names
+
+                if (resolvedNames.length > 0) {
+                    bookData.author = resolvedNames.join(', ');
+                } else if (authorFallback) {
+                    bookData.author = authorFallback; // Fallback if DB lookup failed
+                }
+            } else if (authorFallback) {
+                bookData.author = authorFallback;
+            }
+
             if (bookData.title) bookData.title = bookData.title.substring(0, 255);
             if (bookData.author) bookData.author = (bookData.author || '').substring(0, 2000);
             if (bookData.imageUrl) bookData.imageUrl = (bookData.imageUrl || '').substring(0, 255);

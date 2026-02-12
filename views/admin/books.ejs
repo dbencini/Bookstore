@@ -134,7 +134,8 @@
                     data-created-at="<%= new Date(book.createdAt).toLocaleString() %>"
                     data-updated-at="<%= new Date(book.updatedAt).toLocaleString() %>">
                     <td>
-                        <img src="<%= book.imageUrl %>" alt="Cover" class="img-thumbnail" style="height: 60px;">
+                        <img src="<%= book.imageUrl %>" alt="Cover" class="img-thumbnail" style="height: 60px;"
+                            referrerpolicy="no-referrer">
                     </td>
                     <td>
                         <strong>
@@ -274,7 +275,8 @@
                                         <!-- Left Column: Image -->
                                         <div class="col-md-4 text-center">
                                             <img id="modalBookThumbnail" src="" alt="Cover"
-                                                class="img-fluid rounded shadow mb-2" style="max-height: 250px;">
+                                                class="img-fluid rounded shadow mb-2" style="max-height: 250px;"
+                                                referrerpolicy="no-referrer">
                                             <div class="small text-muted mb-1">Created: <span
                                                     id="modalCreatedAt"></span>
                                             </div>

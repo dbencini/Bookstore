@@ -31,6 +31,7 @@ app.use((req, res, next) => {
     next();
 });
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(expressLayouts);
 app.set('view engine', 'ejs');
 
@@ -143,10 +144,10 @@ app.use(async (req, res, next) => {
             res.locals.themeColorRgb = '13, 110, 253';
         }
 
-        // Fetch Categories for Global Menu
+        // Fetch Categories for Global Menu (Sorted by Priority)
         let categories = [];
         try {
-            categories = await Category.findAll({ order: [['name', 'ASC']], timeout: 5000 });
+            categories = await Category.findAll({ order: [['priority', 'DESC'], ['name', 'ASC']], timeout: 5000 });
         } catch (catErr) {
             console.error('Failed to fetch categories for menu:', catErr.message);
         }
@@ -218,6 +219,21 @@ app.get('/', (req, res) => {
 app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`Debug URL: http://localhost:${PORT}/?cb=${Date.now()}`);
+
+    // Schedule Daily Bestseller Sync (At midnight)
+    const cron = require('node-cron');
+    const { exec } = require('child_process');
+    cron.schedule('0 0 * * *', () => {
+        console.log('[Cron] Running daily bestseller sync...');
+        exec('node scripts/fetch_bestsellers.js', (error, stdout, stderr) => {
+            if (error) {
+                console.error(`[Cron] Error: ${error.message}`);
+                return;
+            }
+            if (stderr) console.error(`[Cron] Stderr: ${stderr}`);
+            console.log(`[Cron] Stdout: ${stdout}`);
+        });
+    });
 });
 // }).catch(err => {
 //     console.error('Database sync failed:', err);

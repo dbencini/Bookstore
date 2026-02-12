@@ -19,6 +19,10 @@ const Category = sequelize.define('Category', {
     book_count: {
         type: DataTypes.INTEGER,
         defaultValue: 0
+    },
+    priority: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
     }
 }, {
     tableName: 'category',
