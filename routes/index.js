@@ -121,7 +121,7 @@ router.get('/books', async (req, res) => {
                     SELECT b.* FROM books b
                     JOIN book_category bc ON b.id = bc.BookId
                     WHERE bc.CategoryId = :categoryId AND b.isVisible = true 
-                    ORDER BY b.createdAt DESC LIMIT :limit OFFSET :offset
+                    ORDER BY bc.createdAt DESC LIMIT :limit OFFSET :offset
                 `, {
                     replacements: { categoryId: categoryData.id, limit, offset },
                     type: sequelize.QueryTypes.SELECT, model: Book, mapToModel: true

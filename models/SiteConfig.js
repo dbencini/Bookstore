@@ -31,6 +31,10 @@ const SiteConfig = sequelize.define('SiteConfig', {
     sandboxCloudPrint: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+    },
+    adminDashboardStats: {
+        type: DataTypes.JSON,
+        defaultValue: {}
     }
 });
 

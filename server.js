@@ -235,6 +235,25 @@ app.listen(PORT, async () => {
         });
     });
 });
+
+// Schedule Admin Counts Update (Every 15 minutes)
+cron.schedule('*/15 * * * *', () => {
+    console.log('[Cron] Updating Admin Dashboard Counts...');
+    exec('node scripts/update_admin_counts.js', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`[Cron] Error: ${error.message}`);
+            return;
+        }
+        // if (stderr) console.error(`[Cron] Stderr: ${stderr}`); // Helper adds noise
+        console.log(`[Cron] Stats Updated: ${stdout.trim()}`);
+    });
+});
+
+// Run once on startup (after 10s delay)
+setTimeout(() => {
+    console.log('[Startup] trigger initial admin count update...');
+    exec('node scripts/update_admin_counts.js');
+}, 10000);
 // }).catch(err => {
 //     console.error('Database sync failed:', err);
 // });

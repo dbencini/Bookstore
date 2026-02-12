@@ -1,0 +1,13 @@
+{
+  "category": {
+    "name": "Crafts & Hobbies",
+    "id": "ac8d77d7-a2d8-4719-9dcc-3c857f66d9f4",
+    "count": 7247
+  },
+  "original": {
+    "averageMs": 5107
+  },
+  "optimized": {
+    "averageMs": 290
+  }
+}

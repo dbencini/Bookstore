@@ -20,7 +20,7 @@ const getGlobalCount = async () => {
 };
 
 const router = express.Router();
-const { sequelize, User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem, OrderSource, CpOrderItem, CpOrder, CpFile, CpAddress, Op } = require('../models');
+const { sequelize, User, UserType, Book, Category, Job, FooterSetting, Order, OrderNote, Workshop, OrderItem, OrderSource, CpOrderItem, CpOrder, CpFile, CpAddress, SiteConfig, Op } = require('../models');
 
 // Book Management
 
@@ -274,26 +274,24 @@ router.get('/books', async (req, res) => {
             isQuickFilter = true;
             switch (quickFilter) {
                 case 'missing_author':
+                    // Uses idx_books_author_prefix_updated_at
                     where.author = { [Op.or]: [null, '', 'Unknown'] };
                     break;
                 case 'missing_image':
-                    where.imageUrl = {
-                        [Op.or]: [
-                            null,
-                            '',
-                            { [Op.like]: '%placehold.co%' },
-                            { [Op.like]: '%default_cover.svg%' },
-                            { [Op.like]: '%placeholder-book.png%' }
-                        ]
-                    };
+                    // Simplified: Pattern check showed 0 matches for placeholders. 
+                    // Focusing on NULL/Empty for performance using idx_books_image_prefix_updated_at
+                    where.imageUrl = { [Op.or]: [null, ''] };
                     break;
                 case 'missing_title':
+                    // Uses idx_books_title_prefix_updated_at
                     where.title = { [Op.or]: [null, ''] };
                     break;
                 case 'missing_description':
+                    // Uses idx_books_description_prefix_updated_at
                     where.description = { [Op.or]: [null, '', 'No description available.'] };
                     break;
                 case 'missing_price':
+                    // Uses idx_books_price_updated_at
                     where.price = { [Op.or]: [null, 0] };
                     break;
                 case 'incomplete':
@@ -368,7 +366,28 @@ router.get('/books', async (req, res) => {
             });
         } else {
             // Searching/Filtering path
-            count = await Book.count({ where });
+
+            // Optimization: Use cached count for Quick Filters to avoid expensive COUNT(*) query
+            let usedCachedCount = false;
+            if (isQuickFilter) {
+                try {
+                    const siteConfig = await SiteConfig.findOne({ attributes: ['adminDashboardStats'] });
+                    if (siteConfig && siteConfig.adminDashboardStats && siteConfig.adminDashboardStats.filters) {
+                        const cachedVal = siteConfig.adminDashboardStats.filters[quickFilter];
+                        if (cachedVal !== undefined) {
+                            count = cachedVal;
+                            usedCachedCount = true;
+                        }
+                    }
+                } catch (configErr) {
+                    console.error('Failed to load cached stats:', configErr);
+                }
+            }
+
+            if (!usedCachedCount) {
+                count = await Book.count({ where });
+            }
+
             rows = await Book.findAll({
                 where,
                 limit,
@@ -523,7 +542,7 @@ router.post('/books/:id/update', async (req, res) => {
     try {
         const book = await Book.findByPk(req.params.id);
         if (book) {
-            const { categoryId, price, imageUrl, stock, description, isVisible, isbn } = req.body;
+            const { categoryId, price, price_cost, imageUrl, stock, description, isVisible, isbn } = req.body;
 
 
             if (req.body.categoryIds) {
@@ -532,6 +551,7 @@ router.post('/books/:id/update', async (req, res) => {
             }
 
             if (price) book.price = parseFloat(price);
+            if (price_cost) book.price_cost = parseFloat(price_cost); // Add Cost Price support
             if (imageUrl) book.imageUrl = imageUrl;
             if (isbn) book.isbn = isbn;
 

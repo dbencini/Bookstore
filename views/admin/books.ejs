@@ -128,6 +128,7 @@
             <% books.forEach(book=> { %>
                 <tr id="tr-<%= book.id %>" class="clickable-row" data-id="<%= book.id %>" data-title="<%= book.title %>"
                     data-author="<%= book.author %>" data-isbn="<%= book.isbn || '' %>" data-price="<%= book.price %>"
+                    data-price-cost="<%= book.price_cost %>"
                     data-categories='<%= JSON.stringify((book.Categories || []).map(c => c.id)) %>'
                     data-image="<%= book.imageUrl %>" data-stock="<%= book.stock %>"
                     data-is-visible="<%= book.isVisible %>"
@@ -306,7 +307,7 @@
                                                     class="form-control" rows="3"></textarea>
                                             </div>
                                             <div class="row">
-                                                <div class="col-md-6 mb-3">
+                                                <div class="col-md-4 mb-3">
                                                     <label class="form-label fw-bold">Categories</label>
                                                     <div id="categoryCheckboxContainer"
                                                         class="form-control overflow-auto bg-light"
@@ -325,9 +326,14 @@
                                                     </div>
                                                     <small class="text-muted">Select all that apply</small>
                                                 </div>
-                                                <div class="col-md-6 mb-3">
+                                                <div class="col-md-4 mb-3">
                                                     <label class="form-label fw-bold">Price (R)</label>
                                                     <input type="number" name="price" id="modalBookPrice"
+                                                        class="form-control" step="0.01" min="0">
+                                                </div>
+                                                <div class="col-md-4 mb-3">
+                                                    <label class="form-label fw-bold">Cost Price (R)</label>
+                                                    <input type="number" name="price_cost" id="modalBookPriceCost"
                                                         class="form-control" step="0.01" min="0">
                                                 </div>
                                             </div>
@@ -446,7 +452,54 @@
                                     const result = await response.json();
 
                                     if (result.success) {
-                                        window.location.reload();
+                                        // Update Table Row directly to avoid reload
+                                        const bookId = document.getElementById('modalBookId').value;
+                                        const row = document.getElementById('tr-' + bookId);
+                                        if (row) {
+                                            const book = result.book; // Backend returns updated book
+
+                                            // Update Data Attributes
+                                            row.dataset.title = book.title;
+                                            row.dataset.author = book.author;
+                                            row.dataset.isbn = book.isbn || '';
+                                            row.dataset.price = book.price || 0;
+                                            row.dataset.priceCost = book.price_cost || 0;
+                                            row.dataset.isVisible = book.isVisible;
+                                            row.dataset.image = book.imageUrl;
+                                            row.dataset.updatedAt = new Date(book.updatedAt).toLocaleString();
+
+                                            // Update Cells
+                                            const cells = row.cells;
+
+                                            // Cell 0: Image
+                                            const img = cells[0].querySelector('img');
+                                            if (img) img.src = book.imageUrl;
+
+                                            // Cell 1: Title/Author
+                                            cells[1].innerHTML = `<strong>${book.title}</strong><br><small class="text-muted">${book.author}</small>`;
+
+                                            // Cell 2: ISBN
+                                            cells[2].textContent = book.isbn || '-';
+
+                                            // Cell 3: Price
+                                            cells[3].textContent = 'R' + (book.price ? parseFloat(book.price).toFixed(2) : '0.00');
+
+                                            // Cell 6: Updated At
+                                            cells[6].textContent = new Date(book.updatedAt).toLocaleDateString();
+
+                                            // Cell 7: Status
+                                            if (book.isVisible) {
+                                                cells[7].innerHTML = '<span class="badge bg-success">Visible</span>';
+                                            } else {
+                                                cells[7].innerHTML = '<span class="badge bg-warning text-dark">Hidden</span>';
+                                            }
+                                        }
+                                        editModal.hide();
+                                        // Highlight row briefly to show success
+                                        if (row) {
+                                            row.classList.add('table-success');
+                                            setTimeout(() => row.classList.remove('table-success'), 1500);
+                                        }
                                     } else {
                                         alert('Update failed: ' + (result.error || 'Unknown error'));
                                     }
@@ -498,6 +551,9 @@
                                 // Ensure price uses period decimal separator (South African standard)
                                 const priceValue = parseFloat(ds.price);
                                 document.getElementById('modalBookPrice').value = isNaN(priceValue) ? '' : priceValue.toFixed(2);
+
+                                const priceCostValue = parseFloat(ds.priceCost);
+                                document.getElementById('modalBookPriceCost').value = isNaN(priceCostValue) ? '' : priceCostValue.toFixed(2);
                                 document.getElementById('modalBookImage').value = ds.image;
                                 document.getElementById('modalBookThumbnail').src = ds.image;
 
@@ -511,18 +567,32 @@
                             });
                         });
 
-                        // --- Fetch from Google Books API ---
                         document.getElementById('btnFetchGoogleData').addEventListener('click', async function () {
-                            const isbn = document.getElementById('modalBookIsbn').value;
+                            const isbnInput = document.getElementById('modalBookIsbn');
+                            const isbn = isbnInput.value;
+                            const btn = this;
+                            const originalHTML = '<i class="bi bi-cloud-download"></i> Fetch from Google';
+
+                            // Helper for temporary feedback
+                            const showFeedback = (msg, cls) => {
+                                btn.innerHTML = msg;
+                                btn.classList.remove('btn-warning');
+                                btn.classList.add(cls);
+                                setTimeout(() => {
+                                    btn.innerHTML = originalHTML;
+                                    btn.classList.remove(cls);
+                                    btn.classList.add('btn-warning');
+                                    btn.disabled = false;
+                                }, 2000);
+                            };
 
                             if (!isbn || isbn.trim().length === 0) {
-                                alert('No ISBN found. Cannot fetch data from Google Books API.');
+                                isbnInput.focus();
+                                showFeedback('No ISBN!', 'btn-danger');
                                 return;
                             }
 
                             // Disable button and show loading state
-                            const btn = this;
-                            const originalHTML = btn.innerHTML;
                             btn.disabled = true;
                             btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Fetching...';
 
@@ -593,18 +663,13 @@
                                         }
                                     }
 
-
-                                    alert('Data fetched successfully! Review the fields and click "Update Book" to save.');
+                                    showFeedback('Fetched!', 'btn-success');
                                 } else {
-                                    alert('No data found for this ISBN in Google Books API.');
+                                    showFeedback('Not Found', 'btn-danger');
                                 }
                             } catch (err) {
                                 console.error('Google API Error:', err);
-                                alert('Error fetching data: ' + err.message);
-                            } finally {
-                                // Re-enable button
-                                btn.disabled = false;
-                                btn.innerHTML = originalHTML;
+                                showFeedback('Error', 'btn-danger');
                             }
                         });
 
